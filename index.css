@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Space Grotesk", sans-serif;
+
+  /* Neobrutalism Colors */
+  --color-main: #FFD21E;
+  --color-main-foreground: #000000;
+  
+  --color-background: #f4f4f0; /* A slight off-white/beige often used in neobrutalism */
+  --color-secondary-background: #ffffff;
+  
+  --color-foreground: #000000;
+  --color-border: #000000;
+  --color-input: #ffffff;
+  --color-ring: #000000;
+  --color-muted: #e0e0e0;
+  --color-muted-foreground: #666666;
+  --color-destructive: #ff6b6b;
+  --color-destructive-foreground: #000000;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #000000;
+  --color-card: #ffffff;
+  --color-card-foreground: #000000;
+  --color-accent: #FFD21E;
+  --color-accent-foreground: #000000;
+  
+  /* Shadows */
+  --shadow-shadow: 4px 4px 0px 0px #000000;
+  
+  /* Spacing for translation effects */
+  --spacing-boxShadowX: 4px;
+  --spacing-boxShadowY: 4px;
+  --spacing-reverseBoxShadowX: -4px;
+  --spacing-reverseBoxShadowY: -4px;
+  
+  /* Radii */
+  --radius-base: 5px;
+}
+
+/* Base Styles */
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-left: 2px solid black;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-main);
+  border: 2px solid black;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #e6bc17;
+}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from './ui/button';
 
 interface NeoButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost';
@@ -12,21 +13,25 @@ export const NeoButton: React.FC<NeoButtonProps> = ({
   className = '', 
   ...props 
 }) => {
-  const baseStyles = "font-bold py-2 px-4 flex items-center justify-center gap-2 transition-all duration-200 text-sm sm:text-base";
   
-  const variants = {
-    primary: "bg-hf-yellow text-black border-2 border-black shadow-neo hover:shadow-neo-hover hover:-translate-y-0.5 hover:-translate-x-0.5 active:translate-x-0 active:translate-y-0 active:shadow-none",
-    secondary: "bg-white text-black border-2 border-black shadow-neo hover:shadow-neo-hover hover:-translate-y-0.5 hover:-translate-x-0.5 active:translate-x-0 active:translate-y-0 active:shadow-none",
-    ghost: "bg-transparent text-black border-2 border-transparent hover:bg-gray-200"
-  };
+  let uiVariant: "default" | "neutral" | "noShadow" | "reverse" | null | undefined = "default";
+  let extraClasses = "";
+
+  if (variant === 'secondary') {
+    uiVariant = 'neutral';
+  } else if (variant === 'ghost') {
+    uiVariant = 'noShadow'; // Closest base
+    extraClasses = "bg-transparent border-transparent shadow-none hover:bg-gray-200 hover:translate-x-0 hover:translate-y-0";
+  }
 
   return (
-    <button 
-      className={`${baseStyles} ${variants[variant]} ${className}`} 
+    <Button 
+      variant={uiVariant as any}
+      className={`${extraClasses} ${className}`} 
       {...props}
     >
-      {icon && <span className="text-lg">{icon}</span>}
+      {icon && <span className="text-lg mr-2">{icon}</span>}
       {children}
-    </button>
+    </Button>
   );
 };

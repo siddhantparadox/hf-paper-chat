@@ -1,4 +1,6 @@
 import React from 'react';
+import { Card } from './ui/card';
+import { cn } from '@/lib/utils';
 
 interface NeoCardProps {
   children: React.ReactNode;
@@ -8,11 +10,15 @@ interface NeoCardProps {
 
 export const NeoCard: React.FC<NeoCardProps> = ({ children, className = '', onClick }) => {
   return (
-    <div 
+    <Card 
       onClick={onClick}
-      className={`bg-white border-2 border-black shadow-neo p-6 ${onClick ? 'cursor-pointer hover:shadow-neo-hover hover:-translate-y-1 transition-all' : ''} ${className}`}
+      className={cn(
+        "p-6", // Explicitly set padding to match original usage
+        onClick && "cursor-pointer hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none transition-all",
+        className
+      )}
     >
       {children}
-    </div>
+    </Card>
   );
 };
