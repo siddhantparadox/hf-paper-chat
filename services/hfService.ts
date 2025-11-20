@@ -17,10 +17,11 @@ interface HFPaperResponse {
   };
 }
 
-export const fetchDailyPapers = async (): Promise<Paper[]> => {
+export const fetchDailyPapers = async (date?: string): Promise<Paper[]> => {
   try {
-    console.log("Fetching daily papers from /hf-api/daily_papers");
-    const response = await fetch('/hf-api/daily_papers');
+    const url = date ? `/hf-api/daily_papers?date=${date}` : '/hf-api/daily_papers';
+    console.log(`Fetching daily papers from ${url}`);
+    const response = await fetch(url);
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'No error details available');

@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from 'react';
+import { format } from 'date-fns';
+import { Calendar as CalendarIcon } from 'lucide-react';
 import { Paper } from '../types';
 import { NeoCard } from './NeoCard';
 import { fetchDailyPapers } from '../services/hfService';
+import { Calendar } from './ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Button } from './ui/button';
+import { cn } from '@/lib/utils';
 
 interface PaperListProps {
   onSelectPaper: (paper: Paper) => void;
@@ -11,12 +17,16 @@ export const PaperList: React.FC<PaperListProps> = ({ onSelectPaper }) => {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [date, setDate] = useState<Date | undefined>(new Date());
 
   useEffect(() => {
     const loadPapers = async () => {
       try {
         setIsLoading(true);
-        const data = await fetchDailyPapers();
+        setError(null);
+        // Format date as YYYY-MM-DD if selected
+        const dateStr = date ? format(date, 'yyyy-MM-dd') : undefined;
+        const data = await fetchDailyPapers(dateStr);
         setPapers(data);
       } catch (err: any) {
         console.error("PaperList load error:", err);
@@ -27,15 +37,48 @@ export const PaperList: React.FC<PaperListProps> = ({ onSelectPaper }) => {
     };
 
     loadPapers();
-  }, []);
+  }, [date]);
+
+  // Shared Loading/Error UI container
+  const Container = ({ children }: { children: React.ReactNode }) => (
+    <main className="max-w-7xl mx-auto p-4 md:p-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+        <div>
+          <h2 className="text-4xl md:text-5xl font-black mb-4">Daily Trending Papers</h2>
+          <p className="text-xl text-gray-600 font-medium border-l-4 border-hf-yellow pl-4">
+            Discover the latest breakthroughs in AI and chat with them directly.
+          </p>
+        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant={"neutral"}
+              className={cn(
+                "w-[240px] justify-start text-left font-bold",
+                !date && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {date ? format(date, "PPP") : <span>Pick a date</span>}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              mode="single"
+              selected={date}
+              onSelect={setDate}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
+      {children}
+    </main>
+  );
 
   if (isLoading) {
     return (
-      <main className="max-w-7xl mx-auto p-4 md:p-8">
-        <div className="mb-8">
-          <h2 className="text-4xl md:text-5xl font-black mb-4">Daily Trending Papers</h2>
-          <div className="h-6 w-64 bg-gray-200 animate-pulse rounded"></div>
-        </div>
+      <Container>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
              <div key={i} className="h-96 bg-gray-100 border-2 border-black shadow-neo animate-pulse p-6">
@@ -46,40 +89,36 @@ export const PaperList: React.FC<PaperListProps> = ({ onSelectPaper }) => {
              </div>
           ))}
         </div>
-      </main>
+      </Container>
     );
   }
 
   if (error) {
     return (
-      <main className="max-w-7xl mx-auto p-8 flex flex-col items-center justify-center text-center min-h-[50vh]">
-        <div className="text-6xl mb-4">⚠️</div>
-        <h2 className="text-3xl font-black mb-2">Connection Error</h2>
-        <div className="bg-red-50 border-2 border-red-200 p-4 rounded mb-6 max-w-2xl overflow-auto">
-            <p className="text-red-800 font-mono text-sm whitespace-pre-wrap">{error}</p>
+      <Container>
+        <div className="flex flex-col items-center justify-center text-center min-h-[50vh]">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h2 className="text-3xl font-black mb-2">Connection Error</h2>
+          <div className="bg-red-50 border-2 border-red-200 p-4 rounded mb-6 max-w-2xl overflow-auto">
+              <p className="text-red-800 font-mono text-sm whitespace-pre-wrap">{error}</p>
+          </div>
+          <p className="text-lg text-gray-600 mb-6">
+              If you are seeing a CORS error (Failed to fetch), the Hugging Face API might be blocking direct browser requests from this domain.
+          </p>
+          <Button 
+            onClick={() => window.location.reload()} 
+            variant="default"
+            className="px-6 py-3 font-bold"
+          >
+            Retry Connection
+          </Button>
         </div>
-        <p className="text-lg text-gray-600 mb-6">
-            If you are seeing a CORS error (Failed to fetch), the Hugging Face API might be blocking direct browser requests from this domain.
-        </p>
-        <button 
-          onClick={() => window.location.reload()} 
-          className="px-6 py-3 bg-hf-yellow border-2 border-black shadow-neo font-bold hover:shadow-neo-hover transition-all"
-        >
-          Retry Connection
-        </button>
-      </main>
+      </Container>
     );
   }
 
   return (
-    <main className="max-w-7xl mx-auto p-4 md:p-8">
-      <div className="mb-8">
-        <h2 className="text-4xl md:text-5xl font-black mb-4">Daily Trending Papers</h2>
-        <p className="text-xl text-gray-600 font-medium border-l-4 border-hf-yellow pl-4">
-          Discover the latest breakthroughs in AI and chat with them directly.
-        </p>
-      </div>
-
+    <Container>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {papers.map((paper) => (
           <NeoCard key={paper.id} onClick={() => onSelectPaper(paper)} className="flex flex-col h-full group">
@@ -138,6 +177,6 @@ export const PaperList: React.FC<PaperListProps> = ({ onSelectPaper }) => {
           </NeoCard>
         ))}
       </div>
-    </main>
+    </Container>
   );
 };
