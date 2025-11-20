@@ -110,3 +110,53 @@ export const getPaperById = async (paperId: string): Promise<Paper> => {
     throw new Error(error.message || "Could not retrieve paper details.");
   }
 };
+
+export interface HFPaperRepos {
+  models: { id: string; likes: number; author: string }[];
+  datasets: { id: string; likes: number; author: string }[];
+  spaces: { id: string; likes: number; author: string }[];
+}
+
+export const fetchPaperRepos = async (paperId: string): Promise<HFPaperRepos> => {
+  try {
+    // Fetch from filtered endpoints for Models and Datasets to get comprehensive lists.
+    // For Spaces, the filter endpoint often returns 0 because spaces aren't always explicitly tagged with arxiv.
+    // So we use the /repos endpoint for Spaces, which uses internal linkage logic.
+    const [modelsRes, datasetsRes, reposRes] = await Promise.all([
+      fetch(`/hf-api/models?filter=arxiv:${paperId}&limit=1000`),
+      fetch(`/hf-api/datasets?filter=arxiv:${paperId}&limit=1000`),
+      fetch(`/hf-api/arxiv/${paperId}/repos`)
+    ]);
+
+    const parseRes = async (res: Response) => {
+        if (!res.ok) return [];
+        const data = await res.json();
+        return data.map((item: any) => ({
+            id: item.id,
+            likes: item.likes || 0,
+            author: item.author || item.id.split('/')[0]
+        }));
+    };
+
+    const models = await parseRes(modelsRes);
+    const datasets = await parseRes(datasetsRes);
+    
+    // Parse spaces from the /repos endpoint response
+    let spaces: { id: string; likes: number; author: string }[] = [];
+    if (reposRes.ok) {
+        const reposData = await reposRes.json();
+        if (reposData.spaces && Array.isArray(reposData.spaces)) {
+            spaces = reposData.spaces.map((item: any) => ({
+                id: item.id,
+                likes: item.likes || 0,
+                author: item.author || item.id.split('/')[0]
+            }));
+        }
+    }
+
+    return { models, datasets, spaces };
+  } catch (e) {
+    console.error("Error fetching paper repos", e);
+    return { models: [], datasets: [], spaces: [] };
+  }
+};

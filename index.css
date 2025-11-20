@@ -24,6 +24,7 @@
   --color-card-foreground: #000000;
   --color-accent: #FFD21E;
   --color-accent-foreground: #000000;
+  --color-overlay: rgba(0,0,0,0.5);
   
   /* Shadows */
   --shadow-shadow: 4px 4px 0px 0px #000000;
