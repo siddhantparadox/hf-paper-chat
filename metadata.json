@@ -1,0 +1,5 @@
+{
+  "name": "HuggingXiv Chat",
+  "description": "A Neo-brutalist, AI-powered platform to explore and chat about trending Hugging Face papers using Gemini 3.0 Pro.",
+  "requestFramePermissions": []
+}
