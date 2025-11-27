@@ -6,6 +6,19 @@ export interface Paper {
   publishedDate: string;
   upvotes: number;
   tags: string[];
+  numComments?: number;
+  discussionId?: string;
+  submittedBy?: {
+    name: string;
+    avatarUrl?: string;
+  };
+  organization?: {
+    name: string;
+    avatarUrl?: string;
+  };
+  githubRepo?: string;
+  projectPage?: string;
+  githubStars?: number;
   aiSummary?: string;
   aiKeywords?: string[];
   thumbnailUrl?: string;

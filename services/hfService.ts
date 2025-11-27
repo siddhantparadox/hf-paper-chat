@@ -46,6 +46,13 @@ export const fetchDailyPapers = async (date?: string): Promise<Paper[]> => {
       const aiKeywords = (item as any).ai_keywords || (item.paper as any).ai_keywords || [];
       const thumbnail = (item as any).thumbnail || (item.paper as any).thumbnail;
       const mediaUrls = (item as any).mediaUrls || (item as any).media_urls || (item.paper as any).mediaUrls || [];
+      const discussionId = (item as any).discussionId || (item.paper as any).discussionId;
+      const numComments = (item as any).numComments ?? (item.paper as any).numComments;
+      const submittedOnDailyBy = (item as any).submittedOnDailyBy;
+      const organization = (item as any).organization || (item.paper as any).organization;
+      const githubRepo = (item as any).githubRepo || (item.paper as any).githubRepo;
+      const projectPage = (item as any).projectPage || (item.paper as any).projectPage;
+
       return {
         id: item.paper.id,
         title: item.paper.title || 'Untitled Paper',
@@ -55,6 +62,12 @@ export const fetchDailyPapers = async (date?: string): Promise<Paper[]> => {
         aiKeywords: Array.isArray(aiKeywords) ? aiKeywords : [],
         publishedDate: item.paper.publishedAt ? new Date(item.paper.publishedAt).toLocaleDateString() : 'Unknown Date',
         upvotes: item.paper.upvotes || 0,
+        numComments: numComments || 0,
+        discussionId,
+        submittedBy: submittedOnDailyBy ? { name: submittedOnDailyBy.fullname || submittedOnDailyBy.user || '', avatarUrl: submittedOnDailyBy.avatarUrl } : undefined,
+        organization: organization ? { name: organization.fullname || organization.name, avatarUrl: organization.avatar } : undefined,
+        githubRepo,
+        projectPage,
         tags: [], // HF Daily papers endpoint often doesn't return tags at this level
         imageUrl: thumbnail || `https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/${item.paper.id}.png`,
         thumbnailUrl: thumbnail || `https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/${item.paper.id}.png`,
@@ -100,6 +113,13 @@ export const searchPapers = async (query: string): Promise<Paper[]> => {
       const keywords = (paperData.ai_keywords as string[]) || (item as any).ai_keywords || paperData.tags || [];
       const thumbnail = paperData.thumbnail || (item as any).thumbnail;
       const mediaUrls = paperData.mediaUrls || paperData.media_urls || (item as any).mediaUrls || [];
+      const discussionId = (item as any).discussionId || (paperData as any).discussionId;
+      const numComments = (item as any).numComments ?? (paperData as any).numComments;
+      const githubRepo = (item as any).githubRepo || (paperData as any).githubRepo;
+      const projectPage = (item as any).projectPage || (paperData as any).projectPage;
+      const githubStars = (item as any).githubStars || (paperData as any).githubStars;
+      const submitted = (item as any).submittedOnDailyBy;
+      const organization = (item as any).organization || (paperData as any).organization;
 
       return {
         id: paperData.id,
@@ -111,6 +131,13 @@ export const searchPapers = async (query: string): Promise<Paper[]> => {
           ? new Date(paperData.publishedAt).toLocaleDateString()
           : 'Unknown Date',
         upvotes: paperData.upvotes || (item as any).upvotes || 0,
+        numComments: numComments || 0,
+        discussionId,
+        githubRepo,
+        projectPage,
+        githubStars: githubStars || 0,
+        submittedBy: submitted ? { name: submitted.fullname || submitted.user || '', avatarUrl: submitted.avatarUrl } : undefined,
+        organization: organization ? { name: organization.fullname || organization.name, avatarUrl: organization.avatar } : undefined,
         tags: Array.isArray(keywords) ? keywords : [],
         aiKeywords: Array.isArray(keywords) ? keywords : [],
         imageUrl: thumbnail
@@ -142,6 +169,13 @@ export const fetchPaperDetails = async (paperId: string): Promise<Partial<Paper>
     const aiSummary = data.ai_summary || '';
     const aiKeywords = data.ai_keywords || data.tags || [];
     const mediaUrls = data.mediaUrls || data.media_urls || [];
+    const discussionId = data.discussionId;
+    const numComments = data.numComments;
+    const submitted = data.submittedOnDailyBy;
+    const organization = data.organization;
+    const githubRepo = data.githubRepo;
+    const projectPage = data.projectPage;
+    const githubStars = data.githubStars;
 
     return {
       tags: data.tags || [],
@@ -150,6 +184,13 @@ export const fetchPaperDetails = async (paperId: string): Promise<Partial<Paper>
       aiKeywords: Array.isArray(aiKeywords) ? aiKeywords : [],
       thumbnailUrl: data.thumbnail || undefined,
       mediaUrls: Array.isArray(mediaUrls) ? mediaUrls : [],
+      discussionId,
+      numComments,
+      submittedBy: submitted ? { name: submitted.fullname || submitted.user || '', avatarUrl: submitted.avatarUrl } : undefined,
+      organization: organization ? { name: organization.fullname || organization.name, avatarUrl: organization.avatar } : undefined,
+      githubRepo,
+      projectPage,
+      githubStars,
     };
   } catch (e) {
     console.error("Error fetching paper details", e);
@@ -171,6 +212,13 @@ export const getPaperById = async (paperId: string): Promise<Paper> => {
     const aiKeywords = data.ai_keywords || data.tags || [];
     const mediaUrls = data.mediaUrls || data.media_urls || [];
     const thumbnail = data.thumbnail;
+    const discussionId = data.discussionId;
+    const numComments = data.numComments;
+    const submitted = data.submittedOnDailyBy;
+    const organization = data.organization;
+    const githubRepo = data.githubRepo;
+    const projectPage = data.projectPage;
+    const githubStars = data.githubStars;
 
     return {
       id: data.id,
@@ -181,6 +229,13 @@ export const getPaperById = async (paperId: string): Promise<Paper> => {
       aiKeywords: Array.isArray(aiKeywords) ? aiKeywords : [],
       publishedDate: data.publishedAt ? new Date(data.publishedAt).toLocaleDateString() : 'Unknown Date',
       upvotes: data.upvotes || 0,
+      numComments: numComments || 0,
+      discussionId,
+      submittedBy: submitted ? { name: submitted.fullname || submitted.user || '', avatarUrl: submitted.avatarUrl } : undefined,
+      organization: organization ? { name: organization.fullname || organization.name, avatarUrl: organization.avatar } : undefined,
+      githubRepo,
+      projectPage,
+      githubStars,
       tags: data.tags || [],
       imageUrl: thumbnail || `https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/${data.id}.png`,
       thumbnailUrl: thumbnail || `https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/${data.id}.png`,

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, Search, XCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, MessageCircle, Search, Star, ThumbsUp, XCircle } from 'lucide-react';
 import { Paper } from '../types';
 import { NeoCard } from './NeoCard';
 import { fetchDailyPapers, searchPapers } from '../services/hfService';
@@ -17,11 +17,21 @@ const PaperGrid = ({ items, onSelect }: { items: Paper[]; onSelect: (paper: Pape
         <div className="flex justify-between items-start mb-4">
            {paper.tags.length > 0 || (paper.aiKeywords?.length ?? 0) > 0 ? (
              <div className="flex gap-2 flex-wrap">
-               {(paper.aiKeywords?.length ? paper.aiKeywords : paper.tags).slice(0, 3).map(tag => (
-                 <span key={tag} className="bg-gray-100 border border-black px-2 py-1 text-xs font-bold uppercase tracking-wider">
-                   {tag}
+               {(paper.aiKeywords?.length ? paper.aiKeywords : paper.tags)
+                 .slice(0, 4)
+                 .map(tag => (
+                   <span key={tag} className="bg-gray-100 border border-black px-2 py-1 text-xs font-bold uppercase tracking-wider">
+                     {tag}
+                   </span>
+                 ))}
+               {(paper.aiKeywords?.length || paper.tags.length) > 4 && (
+                 <span
+                   className="bg-white border border-black px-2 py-1 text-xs font-bold uppercase tracking-wider"
+                   title={(paper.aiKeywords || paper.tags).slice(4).join(', ')}
+                 >
+                   +{(paper.aiKeywords || paper.tags).length - 4} more
                  </span>
-               ))}
+               )}
              </div>
            ) : (
              <span className="bg-gray-100 border border-black px-2 py-1 text-xs font-bold uppercase tracking-wider">
@@ -32,7 +42,7 @@ const PaperGrid = ({ items, onSelect }: { items: Paper[]; onSelect: (paper: Pape
         </div>
         
         {/* Thumbnail Image if available */}
-        <div className="w-full h-32 mb-4 overflow-hidden border-2 border-black bg-gray-100">
+        <div className="w-full h-28 mb-3 overflow-hidden border-2 border-black bg-gray-100">
            <img 
              src={paper.thumbnailUrl || paper.imageUrl} 
              alt={paper.title} 
@@ -41,18 +51,28 @@ const PaperGrid = ({ items, onSelect }: { items: Paper[]; onSelect: (paper: Pape
            />
         </div>
         
-        <h3 className="text-xl font-bold mb-3 leading-tight group-hover:text-gray-700 transition-colors line-clamp-2">
+        <h3 className="text-xl font-bold mb-2 leading-tight group-hover:text-gray-700 transition-colors">
           {paper.title}
         </h3>
         
-        <p className="text-gray-700 text-sm line-clamp-3 mb-4 flex-grow">
+        <p className="text-gray-700 text-sm mb-2 flex-grow">
           {paper.aiSummary || paper.abstract}
         </p>
+        <div className="flex items-center gap-3 text-xs font-bold text-gray-700 mb-2">
+          <span className="inline-flex items-center gap-1">
+            <ThumbsUp size={14} /> {paper.upvotes}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <MessageCircle size={14} /> {paper.numComments ?? 0}
+          </span>
+          {paper.githubStars ? (
+            <span className="inline-flex items-center gap-1">
+              <Star size={14} /> {paper.githubStars}
+            </span>
+          ) : null}
+        </div>
 
-        <div className="flex items-center justify-between pt-4 border-t-2 border-gray-100 mt-auto">
-           <div className="flex items-center gap-1 text-sm font-bold">
-             <span>👍</span> {paper.upvotes}
-           </div>
+        <div className="flex items-center justify-between pt-3 border-t-2 border-gray-100 mt-auto">
            <div className="flex -space-x-2 overflow-hidden max-w-[50%]">
               {paper.authors.slice(0, 3).map((author, i) => (
                 <div key={i} className="w-8 h-8 rounded-full border-2 border-black bg-white flex items-center justify-center text-xs font-bold shrink-0" title={author}>
@@ -66,6 +86,27 @@ const PaperGrid = ({ items, onSelect }: { items: Paper[]; onSelect: (paper: Pape
               )}
            </div>
         </div>
+
+        {(paper.organization?.name || paper.submittedBy?.name) && (
+          <div className="mt-2 flex items-center justify-between text-xs font-bold text-gray-600">
+            {paper.organization?.name ? (
+              <div className="flex items-center gap-2">
+                {paper.organization.avatarUrl && (
+                  <img
+                    src={paper.organization.avatarUrl}
+                    alt={paper.organization.name}
+                    className="w-5 h-5 rounded-full border border-black object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                )}
+                <span>Org: {paper.organization.name}</span>
+              </div>
+            ) : <span />}
+            {paper.submittedBy?.name ? (
+              <span className="text-right">Submitted by {paper.submittedBy.name}</span>
+            ) : null}
+          </div>
+        )}
       </NeoCard>
     ))}
   </div>

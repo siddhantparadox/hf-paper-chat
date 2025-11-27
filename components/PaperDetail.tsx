@@ -6,6 +6,7 @@ import { Streamdown } from 'streamdown';
 import { fetchPaperDetails, fetchPaperRepos, HFPaperRepos } from '../services/hfService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Button } from './ui/button';
+import { Github, Link2, MessageCircle, Star, ThumbsUp } from 'lucide-react';
 
 interface PaperDetailProps {
   paper: Paper;
@@ -75,7 +76,17 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, o
   useEffect(() => {
     const enrichData = async () => {
       const details = await fetchPaperDetails(initialPaper.id);
-      setPaper(prev => ({ ...prev, ...details }));
+      setPaper(prev => ({
+        ...prev,
+        ...details,
+        numComments: details.numComments ?? prev.numComments,
+        discussionId: details.discussionId ?? prev.discussionId,
+        githubRepo: details.githubRepo ?? prev.githubRepo,
+        projectPage: details.projectPage ?? prev.projectPage,
+        githubStars: details.githubStars ?? prev.githubStars,
+        submittedBy: details.submittedBy ?? prev.submittedBy,
+        organization: details.organization ?? prev.organization,
+      }));
     };
     
     const loadRepos = async () => {
@@ -199,13 +210,26 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, o
               <span className="bg-black text-white px-3 py-1 text-xs font-bold uppercase tracking-wider">
                 {paper.publishedDate}
               </span>
+              {paper.organization?.name && (
+                <span className="flex items-center gap-2 bg-white border-2 border-black px-3 py-1 text-xs font-bold uppercase tracking-wider shadow-neo-sm">
+                  {paper.organization.avatarUrl && (
+                    <img
+                      src={paper.organization.avatarUrl}
+                      alt={paper.organization.name}
+                      className="w-5 h-5 rounded-full border border-black object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  )}
+                  {paper.organization.name}
+                </span>
+              )}
               {paper.tags.map(tag => (
                 <span key={tag} className="bg-hf-yellow border border-black px-3 py-1 text-xs font-bold uppercase tracking-wider">
                   {tag}
                 </span>
               ))}
               {paper.aiKeywords?.length ? (
-                paper.aiKeywords.slice(0, 4).map((kw) => (
+                paper.aiKeywords.map((kw) => (
                   <span key={kw} className="bg-white border-2 border-black px-3 py-1 text-xs font-bold uppercase tracking-wider shadow-neo-sm">
                     {kw}
                   </span>
@@ -214,7 +238,7 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, o
             </div>
             <h1 className="text-3xl md:text-4xl font-black leading-tight mb-6">{paper.title}</h1>
 
-            <div className="flex flex-wrap gap-2 mb-8 text-sm font-medium text-gray-600">
+            <div className="flex flex-wrap gap-2 mb-4 text-sm font-medium text-gray-600">
               <span className="font-bold text-black mr-2">Authors:</span>
               {paper.authors.map((author, i) => (
                 <span key={i} className={i !== paper.authors.length - 1 ? "after:content-[','] mr-1" : ""}>
@@ -222,6 +246,37 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, o
                 </span>
               ))}
             </div>
+
+            <div className="flex flex-wrap items-center gap-4 text-sm font-bold text-gray-700 mb-4">
+              <span className="inline-flex items-center gap-1"><ThumbsUp size={16} /> {paper.upvotes}</span>
+              <span className="inline-flex items-center gap-1"><MessageCircle size={16} /> {paper.numComments ?? initialPaper.numComments ?? 0}</span>
+              {paper.githubStars ? (
+                <span className="inline-flex items-center gap-1"><Star size={16} /> {paper.githubStars}</span>
+              ) : null}
+              <a
+                href={`https://huggingface.co/papers/${paper.id}${paper.discussionId ? `?discussion=${paper.discussionId}` : ''}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <NeoButton variant="secondary" className="h-9 px-4 text-xs">
+                  <MessageCircle size={14} className="mr-2" /> Discuss on HF
+                </NeoButton>
+              </a>
+            </div>
+
+            {paper.submittedBy?.name && (
+              <div className="text-sm font-bold text-gray-600 mb-6 flex items-center gap-2">
+                {paper.submittedBy.avatarUrl && (
+                  <img
+                    src={paper.submittedBy.avatarUrl}
+                    alt={paper.submittedBy.name}
+                    className="w-6 h-6 rounded-full border border-black object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                )}
+                Submitted by {paper.submittedBy.name}
+              </div>
+            )}
           </div>
 
           {paper.aiSummary && (
@@ -252,7 +307,7 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, o
             <div className="mt-6">
               <h4 className="font-black text-xl mb-3">Media</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {paper.mediaUrls.slice(0, 4).map((url, idx) => (
+                {paper.mediaUrls.map((url, idx) => (
                   <div key={idx} className="border-2 border-black shadow-neo-sm bg-white overflow-hidden">
                     <img
                       src={url}
@@ -277,18 +332,37 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, o
           )}
 
           <div className="mt-8 p-6 bg-gray-900 text-white border-2 border-black shadow-neo">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h4 className="font-bold text-xl mb-1">Read Full Paper</h4>
-                <p className="text-gray-400 text-sm">
-                  Access the PDF directly via ArXiv.
-                </p>
+                <h4 className="font-bold text-xl mb-1">Explore the Paper</h4>
+                <p className="text-gray-300 text-sm">Access the PDF, discussion, and related links.</p>
               </div>
-              <a href={`https://arxiv.org/pdf/${paper.id}.pdf`} target="_blank" rel="noopener noreferrer">
-                <NeoButton variant="primary" className="w-full sm:w-auto">
-                  Open PDF
-                </NeoButton>
-              </a>
+              <div className="flex flex-wrap gap-3">
+                <a href={`https://huggingface.co/papers/${paper.id}${paper.discussionId ? `?discussion=${paper.discussionId}` : ''}`} target="_blank" rel="noopener noreferrer">
+                  <NeoButton variant="secondary" className="w-full sm:w-auto">
+                    <MessageCircle size={16} className="mr-2" /> HF Page
+                  </NeoButton>
+                </a>
+                {paper.githubRepo && (
+                  <a href={paper.githubRepo} target="_blank" rel="noopener noreferrer">
+                    <NeoButton variant="secondary" className="w-full sm:w-auto">
+                      <Github size={16} className="mr-2" /> GitHub
+                    </NeoButton>
+                  </a>
+                )}
+                {paper.projectPage && (
+                  <a href={paper.projectPage} target="_blank" rel="noopener noreferrer">
+                    <NeoButton variant="secondary" className="w-full sm:w-auto">
+                      <Link2 size={16} className="mr-2" /> Project
+                    </NeoButton>
+                  </a>
+                )}
+                <a href={`https://arxiv.org/pdf/${paper.id}.pdf`} target="_blank" rel="noopener noreferrer">
+                  <NeoButton variant="primary" className="w-full sm:w-auto">
+                    Open PDF
+                  </NeoButton>
+                </a>
+              </div>
             </div>
           </div>
         </div>
