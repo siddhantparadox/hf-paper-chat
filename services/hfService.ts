@@ -62,6 +62,57 @@ export const fetchDailyPapers = async (date?: string): Promise<Paper[]> => {
   }
 };
 
+export const searchPapers = async (query: string): Promise<Paper[]> => {
+  if (!query.trim()) return [];
+
+  try {
+    const response = await fetch(`/hf-api/papers/search?q=${encodeURIComponent(query.trim())}`);
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'No error details available');
+      throw new Error(`Search failed: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    if (!Array.isArray(data)) {
+      throw new Error("Invalid search response format: Expected an array.");
+    }
+
+    return data.map((item): Paper | null => {
+      const paperData = (item as any).paper || item;
+      if (!paperData?.id) return null;
+
+      const summaryText =
+        (paperData.ai_summary as string) ||
+        (item as any).ai_summary ||
+        paperData.summary ||
+        paperData.abstract ||
+        (item as any).summary ||
+        '';
+
+      const keywords = (paperData.ai_keywords as string[]) || (item as any).ai_keywords || paperData.tags || [];
+
+      return {
+        id: paperData.id,
+        title: paperData.title || 'Untitled Paper',
+        authors: paperData.authors ? paperData.authors.map((a: any) => a.name) : [],
+        abstract: summaryText.replace(/<[^>]*>/g, ''),
+        publishedDate: paperData.publishedAt
+          ? new Date(paperData.publishedAt).toLocaleDateString()
+          : 'Unknown Date',
+        upvotes: paperData.upvotes || (item as any).upvotes || 0,
+        tags: Array.isArray(keywords) ? keywords : [],
+        imageUrl: paperData.thumbnail
+          ? paperData.thumbnail
+          : `https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/${paperData.id}.png`,
+        pdfUrl: `https://arxiv.org/pdf/${paperData.id}.pdf`
+      };
+    }).filter((paper): paper is Paper => paper !== null);
+  } catch (error: any) {
+    console.error("Error searching papers:", error);
+    throw new Error(error.message || "Failed to search papers.");
+  }
+};
+
 export const fetchPaperDetails = async (paperId: string): Promise<Partial<Paper>> => {
   try {
     const response = await fetch(`/hf-api/papers/${paperId}`);
