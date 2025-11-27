@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { format } from 'date-fns';
+import { addDays, addMonths, addWeeks, format, parse } from 'date-fns';
 import { Calendar as CalendarIcon, Loader2, MessageCircle, Search, Star, ThumbsUp, XCircle } from 'lucide-react';
 import { Paper } from '../types';
 import { NeoCard } from './NeoCard';
@@ -112,41 +112,157 @@ const PaperGrid = ({ items, onSelect }: { items: Paper[]; onSelect: (paper: Pape
   </div>
 );
 
-const Container = ({ children, date, setDate }: { children: React.ReactNode; date: Date | undefined; setDate: (d: Date | undefined) => void; }) => (
+const Container = ({
+  children,
+  date,
+  setDate,
+  week,
+  month,
+  setWeek,
+  setMonth,
+}: {
+  children: React.ReactNode;
+  date: Date | undefined;
+  setDate: (d: Date | undefined) => void;
+  week?: string;
+  month?: string;
+  setWeek: (w: string | undefined) => void;
+  setMonth: (m: string | undefined) => void;
+}) => {
+  const label = date
+    ? format(date, "PPP")
+    : week
+      ? `Week ${week}`
+      : month
+        ? `Month ${month}`
+        : "Pick a date";
+
+  const shift = (direction: 1 | -1) => {
+    const today = new Date();
+    if (date) {
+      const next = addDays(date, direction);
+      if (next > today) return;
+      setDate(next);
+      setWeek(undefined);
+      setMonth(undefined);
+      return;
+    }
+    if (week) {
+      // Parse ISO week like 2025-W10 using ISO year (R) and ISO week (II) plus weekday
+      const base = parse(`${week}-1`, "RRRR-'W'II-i", new Date());
+      const next = addWeeks(base, direction);
+      if (next > today) return;
+      setWeek(format(next, "RRRR-'W'II"));
+      setDate(undefined);
+      setMonth(undefined);
+      return;
+    }
+    if (month) {
+      const base = parse(month, 'yyyy-MM', new Date());
+      const next = addMonths(base, direction);
+      // Cap at current month
+      const monthStart = new Date(next.getFullYear(), next.getMonth(), 1);
+      const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      if (monthStart > currentMonthStart) return;
+      setMonth(format(next, 'yyyy-MM'));
+      setDate(undefined);
+      setWeek(undefined);
+      return;
+    }
+    // default: nudge date today
+    setDate(addDays(today, direction));
+    setWeek(undefined);
+    setMonth(undefined);
+  };
+
+  return (
   <main className="max-w-7xl mx-auto p-4 md:p-8">
-    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-      <div>
-        <h2 className="text-4xl md:text-5xl font-black mb-4">Daily Trending Papers</h2>
-        <p className="text-xl text-gray-600 font-medium border-l-4 border-hf-yellow pl-4">
-          Discover the latest breakthroughs in AI and chat with them directly.
-        </p>
+    <div className="flex flex-col gap-3 mb-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-2">
+        <div>
+          <h2 className="text-4xl md:text-5xl font-black mb-1">Daily Papers</h2>
+          <p className="text-base text-gray-700 font-medium">
+            Quick date presets or pick a day to refresh the feed.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="neutral"
+              className="h-9 px-3 font-bold"
+              onClick={() => shift(-1)}
+              aria-label="Previous"
+            >
+              ←
+            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"neutral"}
+                  className={cn(
+                    "w-[220px] justify-start text-left font-bold",
+                    !date && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {label}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(d) => { setDate(d); setWeek(undefined); setMonth(undefined); }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <Button
+              variant="neutral"
+              className="h-9 px-3 font-bold"
+              onClick={() => shift(1)}
+              aria-label="Next"
+            >
+              →
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={date ? "default" : "neutral"}
+              className="h-9 px-3 font-bold"
+              onClick={() => { setDate(new Date()); setWeek(undefined); setMonth(undefined); }}
+            >
+              Today
+            </Button>
+            <Button
+              variant={week ? "default" : "neutral"}
+              className="h-9 px-3 font-bold"
+              onClick={() => { setWeek(format(new Date(), "yyyy-'W'II")); setMonth(undefined); setDate(undefined); }}
+            >
+              This Week
+            </Button>
+            <Button
+              variant={month ? "default" : "neutral"}
+              className="h-9 px-3 font-bold"
+              onClick={() => { setMonth(format(new Date(), 'yyyy-MM')); setWeek(undefined); setDate(undefined); }}
+            >
+              This Month
+            </Button>
+            <Button
+              variant="neutral"
+              className="h-9 px-3 font-bold"
+              onClick={() => { setWeek(undefined); setMonth(undefined); setDate(undefined); }}
+            >
+              Clear
+            </Button>
+          </div>
+        </div>
       </div>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant={"neutral"}
-            className={cn(
-              "w-[240px] justify-start text-left font-bold",
-              !date && "text-muted-foreground"
-            )}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {date ? format(date, "PPP") : <span>Pick a date</span>}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="end">
-          <Calendar
-            mode="single"
-            selected={date}
-            onSelect={setDate}
-            initialFocus
-          />
-        </PopoverContent>
-      </Popover>
     </div>
     {children}
   </main>
-);
+  );
+};
 
 interface PaperListProps {
   onSelectPaper: (paper: Paper) => void;
@@ -157,6 +273,8 @@ export const PaperList: React.FC<PaperListProps> = ({ onSelectPaper }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const [week, setWeek] = useState<string | undefined>();
+  const [month, setMonth] = useState<string | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Paper[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -169,7 +287,11 @@ export const PaperList: React.FC<PaperListProps> = ({ onSelectPaper }) => {
         setError(null);
         // Format date as YYYY-MM-DD if selected
         const dateStr = date ? format(date, 'yyyy-MM-dd') : undefined;
-        const data = await fetchDailyPapers(dateStr);
+        const data = await fetchDailyPapers({
+          date: dateStr,
+          week,
+          month,
+        });
         setPapers(data);
       } catch (err: any) {
         console.error("PaperList load error:", err);
@@ -180,7 +302,7 @@ export const PaperList: React.FC<PaperListProps> = ({ onSelectPaper }) => {
     };
 
     loadPapers();
-  }, [date]);
+  }, [date, week, month]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,7 +331,7 @@ export const PaperList: React.FC<PaperListProps> = ({ onSelectPaper }) => {
 
   if (isLoading) {
     return (
-      <Container date={date} setDate={setDate}>
+      <Container date={date} setDate={setDate} week={week} month={month} setWeek={setWeek} setMonth={setMonth}>
         {/* Search Panel */}
         <div className="mb-6 bg-white border-2 border-black shadow-neo p-4 md:p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
@@ -249,7 +371,7 @@ export const PaperList: React.FC<PaperListProps> = ({ onSelectPaper }) => {
 
   if (error) {
     return (
-      <Container date={date} setDate={setDate}>
+      <Container date={date} setDate={setDate} week={week} month={month} setWeek={setWeek} setMonth={setMonth}>
         {/* Search Panel */}
         <div className="mb-6 bg-white border-2 border-black shadow-neo p-4 md:p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
@@ -295,7 +417,14 @@ export const PaperList: React.FC<PaperListProps> = ({ onSelectPaper }) => {
   }
 
   return (
-    <Container date={date} setDate={setDate}>
+    <Container
+      date={date}
+      setDate={setDate}
+      week={week}
+      month={month}
+      setWeek={setWeek}
+      setMonth={setMonth}
+    >
       {/* Search Panel */}
       <div className="mb-6 bg-white border-2 border-black shadow-neo p-4 md:p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">

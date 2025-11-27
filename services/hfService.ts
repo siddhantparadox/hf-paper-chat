@@ -17,9 +17,14 @@ interface HFPaperResponse {
   };
 }
 
-export const fetchDailyPapers = async (date?: string): Promise<Paper[]> => {
+export const fetchDailyPapers = async (options?: { date?: string; week?: string; month?: string; }): Promise<Paper[]> => {
   try {
-    const url = date ? `/hf-api/daily_papers?date=${date}` : '/hf-api/daily_papers';
+    const params = new URLSearchParams();
+    if (options?.date) params.set('date', options.date);
+    if (options?.week) params.set('week', options.week);
+    if (options?.month) params.set('month', options.month);
+
+    const url = params.toString() ? `/hf-api/daily_papers?${params.toString()}` : '/hf-api/daily_papers';
     console.log(`Fetching daily papers from ${url}`);
     const response = await fetch(url);
 
