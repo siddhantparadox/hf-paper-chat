@@ -183,6 +183,17 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, o
             ← Back to Feed
           </NeoButton>
 
+          {paper.thumbnailUrl || paper.imageUrl ? (
+            <div className="mb-6 border-2 border-black shadow-neo overflow-hidden bg-gray-100">
+              <img
+                src={paper.thumbnailUrl || paper.imageUrl}
+                alt={paper.title}
+                className="w-full h-56 object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            </div>
+          ) : null}
+
           <div className="mb-6">
             <div className="flex gap-2 mb-4 flex-wrap">
               <span className="bg-black text-white px-3 py-1 text-xs font-bold uppercase tracking-wider">
@@ -193,6 +204,13 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, o
                   {tag}
                 </span>
               ))}
+              {paper.aiKeywords?.length ? (
+                paper.aiKeywords.slice(0, 4).map((kw) => (
+                  <span key={kw} className="bg-white border-2 border-black px-3 py-1 text-xs font-bold uppercase tracking-wider shadow-neo-sm">
+                    {kw}
+                  </span>
+                ))
+              ) : null}
             </div>
             <h1 className="text-3xl md:text-4xl font-black leading-tight mb-6">{paper.title}</h1>
 
@@ -205,6 +223,13 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, o
               ))}
             </div>
           </div>
+
+          {paper.aiSummary && (
+            <div className="border-2 border-black bg-white shadow-neo p-5 mb-6">
+              <div className="text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">AI Summary</div>
+              <p className="text-base leading-relaxed text-gray-800">{paper.aiSummary}</p>
+            </div>
+          )}
 
           <div className="prose prose-slate max-w-none border-2 border-black p-6 md:p-8 shadow-neo bg-[#FAFAFA]">
             <div className="flex justify-between items-center mb-4 border-b-2 border-gray-200 pb-2">
@@ -222,6 +247,24 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, o
               {paper.abstract}
             </p>
           </div>
+
+          {paper.mediaUrls && paper.mediaUrls.length > 0 && (
+            <div className="mt-6">
+              <h4 className="font-black text-xl mb-3">Media</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {paper.mediaUrls.slice(0, 4).map((url, idx) => (
+                  <div key={idx} className="border-2 border-black shadow-neo-sm bg-white overflow-hidden">
+                    <img
+                      src={url}
+                      alt={`media-${idx}`}
+                      className="w-full h-40 object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Related Repos Section */}
           {(repos.models.length > 0 || repos.datasets.length > 0 || repos.spaces.length > 0) && (

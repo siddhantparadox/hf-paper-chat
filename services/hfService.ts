@@ -42,15 +42,23 @@ export const fetchDailyPapers = async (date?: string): Promise<Paper[]> => {
       }
 
       const summaryText = item.paper.summary || item.paper.abstract || '';
+      const aiSummary = (item as any).ai_summary || (item.paper as any).ai_summary || '';
+      const aiKeywords = (item as any).ai_keywords || (item.paper as any).ai_keywords || [];
+      const thumbnail = (item as any).thumbnail || (item.paper as any).thumbnail;
+      const mediaUrls = (item as any).mediaUrls || (item as any).media_urls || (item.paper as any).mediaUrls || [];
       return {
         id: item.paper.id,
         title: item.paper.title || 'Untitled Paper',
         authors: item.paper.authors ? item.paper.authors.map(a => a.name) : [],
         abstract: summaryText.replace(/<[^>]*>/g, ''), // Simple strip tags if any
+        aiSummary,
+        aiKeywords: Array.isArray(aiKeywords) ? aiKeywords : [],
         publishedDate: item.paper.publishedAt ? new Date(item.paper.publishedAt).toLocaleDateString() : 'Unknown Date',
         upvotes: item.paper.upvotes || 0,
         tags: [], // HF Daily papers endpoint often doesn't return tags at this level
-        imageUrl: `https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/${item.paper.id}.png`,
+        imageUrl: thumbnail || `https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/${item.paper.id}.png`,
+        thumbnailUrl: thumbnail || `https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/${item.paper.id}.png`,
+        mediaUrls: Array.isArray(mediaUrls) ? mediaUrls : [],
         pdfUrl: `https://arxiv.org/pdf/${item.paper.id}.pdf`
       };
     }).filter((p): p is Paper => p !== null);
@@ -90,20 +98,28 @@ export const searchPapers = async (query: string): Promise<Paper[]> => {
         '';
 
       const keywords = (paperData.ai_keywords as string[]) || (item as any).ai_keywords || paperData.tags || [];
+      const thumbnail = paperData.thumbnail || (item as any).thumbnail;
+      const mediaUrls = paperData.mediaUrls || paperData.media_urls || (item as any).mediaUrls || [];
 
       return {
         id: paperData.id,
         title: paperData.title || 'Untitled Paper',
         authors: paperData.authors ? paperData.authors.map((a: any) => a.name) : [],
         abstract: summaryText.replace(/<[^>]*>/g, ''),
+        aiSummary: (paperData.ai_summary as string) || (item as any).ai_summary,
         publishedDate: paperData.publishedAt
           ? new Date(paperData.publishedAt).toLocaleDateString()
           : 'Unknown Date',
         upvotes: paperData.upvotes || (item as any).upvotes || 0,
         tags: Array.isArray(keywords) ? keywords : [],
-        imageUrl: paperData.thumbnail
-          ? paperData.thumbnail
+        aiKeywords: Array.isArray(keywords) ? keywords : [],
+        imageUrl: thumbnail
+          ? thumbnail
           : `https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/${paperData.id}.png`,
+        thumbnailUrl: thumbnail
+          ? thumbnail
+          : `https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/${paperData.id}.png`,
+        mediaUrls: Array.isArray(mediaUrls) ? mediaUrls : [],
         pdfUrl: `https://arxiv.org/pdf/${paperData.id}.pdf`
       };
     }).filter((paper): paper is Paper => paper !== null);
@@ -123,10 +139,17 @@ export const fetchPaperDetails = async (paperId: string): Promise<Partial<Paper>
 
     const data = await response.json();
     const summaryText = data.summary || data.abstract || '';
+    const aiSummary = data.ai_summary || '';
+    const aiKeywords = data.ai_keywords || data.tags || [];
+    const mediaUrls = data.mediaUrls || data.media_urls || [];
 
     return {
       tags: data.tags || [],
       abstract: summaryText.replace(/<[^>]*>/g, ''),
+      aiSummary,
+      aiKeywords: Array.isArray(aiKeywords) ? aiKeywords : [],
+      thumbnailUrl: data.thumbnail || undefined,
+      mediaUrls: Array.isArray(mediaUrls) ? mediaUrls : [],
     };
   } catch (e) {
     console.error("Error fetching paper details", e);
@@ -144,16 +167,24 @@ export const getPaperById = async (paperId: string): Promise<Paper> => {
     const data = await response.json();
 
     const summaryText = data.summary || data.abstract || "No abstract available.";
+    const aiSummary = data.ai_summary || '';
+    const aiKeywords = data.ai_keywords || data.tags || [];
+    const mediaUrls = data.mediaUrls || data.media_urls || [];
+    const thumbnail = data.thumbnail;
 
     return {
       id: data.id,
       title: data.title,
       authors: data.authors ? data.authors.map((a: any) => a.name) : [],
       abstract: summaryText.replace(/<[^>]*>/g, ''),
+      aiSummary,
+      aiKeywords: Array.isArray(aiKeywords) ? aiKeywords : [],
       publishedDate: data.publishedAt ? new Date(data.publishedAt).toLocaleDateString() : 'Unknown Date',
       upvotes: data.upvotes || 0,
       tags: data.tags || [],
-      imageUrl: `https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/${data.id}.png`,
+      imageUrl: thumbnail || `https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/${data.id}.png`,
+      thumbnailUrl: thumbnail || `https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/${data.id}.png`,
+      mediaUrls: Array.isArray(mediaUrls) ? mediaUrls : [],
       pdfUrl: `https://arxiv.org/pdf/${data.id}.pdf`
     };
   } catch (error: any) {

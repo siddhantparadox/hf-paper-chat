@@ -6,6 +6,10 @@ export interface Paper {
   publishedDate: string;
   upvotes: number;
   tags: string[];
+  aiSummary?: string;
+  aiKeywords?: string[];
+  thumbnailUrl?: string;
+  mediaUrls?: string[];
   pdfUrl?: string;
   imageUrl?: string;
 }

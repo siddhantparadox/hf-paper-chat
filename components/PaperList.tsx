@@ -15,9 +15,9 @@ const PaperGrid = ({ items, onSelect }: { items: Paper[]; onSelect: (paper: Pape
     {items.map((paper) => (
       <NeoCard key={paper.id} onClick={() => onSelect(paper)} className="flex flex-col h-full group">
         <div className="flex justify-between items-start mb-4">
-           {paper.tags.length > 0 ? (
+           {paper.tags.length > 0 || (paper.aiKeywords?.length ?? 0) > 0 ? (
              <div className="flex gap-2 flex-wrap">
-               {paper.tags.slice(0, 2).map(tag => (
+               {(paper.aiKeywords?.length ? paper.aiKeywords : paper.tags).slice(0, 3).map(tag => (
                  <span key={tag} className="bg-gray-100 border border-black px-2 py-1 text-xs font-bold uppercase tracking-wider">
                    {tag}
                  </span>
@@ -34,7 +34,7 @@ const PaperGrid = ({ items, onSelect }: { items: Paper[]; onSelect: (paper: Pape
         {/* Thumbnail Image if available */}
         <div className="w-full h-32 mb-4 overflow-hidden border-2 border-black bg-gray-100">
            <img 
-             src={paper.imageUrl} 
+             src={paper.thumbnailUrl || paper.imageUrl} 
              alt={paper.title} 
              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
@@ -45,8 +45,8 @@ const PaperGrid = ({ items, onSelect }: { items: Paper[]; onSelect: (paper: Pape
           {paper.title}
         </h3>
         
-        <p className="text-gray-600 text-sm line-clamp-3 mb-4 flex-grow">
-          {paper.abstract}
+        <p className="text-gray-700 text-sm line-clamp-3 mb-4 flex-grow">
+          {paper.aiSummary || paper.abstract}
         </p>
 
         <div className="flex items-center justify-between pt-4 border-t-2 border-gray-100 mt-auto">
