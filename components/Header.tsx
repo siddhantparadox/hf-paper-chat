@@ -59,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onHomeClick, onPape
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2 cursor-pointer" onClick={onHomeClick}>
             <div className="text-3xl select-none">🤗</div>
-            <h1 className="text-2xl font-black tracking-tighter hidden sm:block">HuggingXiv</h1>
+            <h1 className="text-2xl font-black tracking-tighter hidden sm:block">HuggingPapers</h1>
           </div>
           
           <div className="flex gap-4">

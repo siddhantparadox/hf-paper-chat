@@ -12,7 +12,7 @@ const MODEL_NAME = "google/gemini-2.5-flash-preview-09-2025";
 
 export const createSystemInstruction = (paper: Paper): string => {
   return `
-    You are a helpful AI research assistant embedded in the "HuggingXiv" platform.
+    You are a helpful AI research assistant embedded in the "HuggingPapers" platform.
     You are currently discussing the following academic paper:
     
     Title: ${paper.title}

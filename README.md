@@ -1,4 +1,4 @@
-# HuggingXiv Chat
+# HuggingPapers
 
 A modern, brutalist-designed chat interface for discussing ArXiv papers, powered by OpenRouter and Gemini 2.5 Flash.
 
