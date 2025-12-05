@@ -10,51 +10,67 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { cn } from '@/lib/utils';
 
-const PaperGrid = ({ items, onSelect }: { items: Paper[]; onSelect: (paper: Paper) => void }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    {items.map((paper) => (
-      <NeoCard key={paper.id} onClick={() => onSelect(paper)} className="flex flex-col h-full group">
+interface PaperCardProps {
+  paper: Paper;
+  onSelect: (p: Paper) => void;
+}
+
+const PaperCard: React.FC<PaperCardProps> = ({ paper, onSelect }) => {
+  const href = `/?paperId=${encodeURIComponent(paper.id)}`;
+
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    onSelect(paper);
+  };
+
+  return (
+    <a
+      href={href}
+      onClick={handleClick}
+      className="block"
+    >
+      <NeoCard interactive className="flex flex-col h-full group">
         <div className="flex justify-between items-start mb-4">
-           {paper.tags.length > 0 || (paper.aiKeywords?.length ?? 0) > 0 ? (
-             <div className="flex gap-2 flex-wrap">
-               {(paper.aiKeywords?.length ? paper.aiKeywords : paper.tags)
-                 .slice(0, 4)
-                 .map(tag => (
-                   <span key={tag} className="bg-gray-100 border border-black px-2 py-1 text-xs font-bold uppercase tracking-wider">
-                     {tag}
-                   </span>
-                 ))}
-               {(paper.aiKeywords?.length || paper.tags.length) > 4 && (
-                 <span
-                   className="bg-white border border-black px-2 py-1 text-xs font-bold uppercase tracking-wider"
-                   title={(paper.aiKeywords || paper.tags).slice(4).join(', ')}
-                 >
-                   +{(paper.aiKeywords || paper.tags).length - 4} more
-                 </span>
-               )}
-             </div>
-           ) : (
-             <span className="bg-gray-100 border border-black px-2 py-1 text-xs font-bold uppercase tracking-wider">
-               ARXIV: {paper.id}
-             </span>
-           )}
+          {paper.tags.length > 0 || (paper.aiKeywords?.length ?? 0) > 0 ? (
+            <div className="flex gap-2 flex-wrap">
+              {(paper.aiKeywords?.length ? paper.aiKeywords : paper.tags)
+                .slice(0, 4)
+                .map(tag => (
+                  <span key={tag} className="bg-gray-100 border border-black px-2 py-1 text-xs font-bold uppercase tracking-wider">
+                    {tag}
+                  </span>
+                ))}
+              {(paper.aiKeywords?.length || paper.tags.length) > 4 && (
+                <span
+                  className="bg-white border border-black px-2 py-1 text-xs font-bold uppercase tracking-wider"
+                  title={(paper.aiKeywords || paper.tags).slice(4).join(', ')}
+                >
+                  +{(paper.aiKeywords || paper.tags).length - 4} more
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="bg-gray-100 border border-black px-2 py-1 text-xs font-bold uppercase tracking-wider">
+              ARXIV: {paper.id}
+            </span>
+          )}
           <span className="text-sm font-bold text-gray-500 whitespace-nowrap ml-2">{paper.publishedDate}</span>
         </div>
-        
+
         {/* Thumbnail Image if available */}
         <div className="w-full h-28 mb-3 overflow-hidden border-2 border-black bg-gray-100">
-           <img 
-             src={paper.thumbnailUrl || paper.imageUrl} 
-             alt={paper.title} 
-             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-           />
+          <img
+            src={paper.thumbnailUrl || paper.imageUrl}
+            alt={paper.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+          />
         </div>
-        
+
         <h3 className="text-xl font-bold mb-2 leading-tight group-hover:text-gray-700 transition-colors">
           {paper.title}
         </h3>
-        
+
         <p className="text-gray-700 text-sm mb-2 flex-grow">
           {paper.aiSummary || paper.abstract}
         </p>
@@ -73,18 +89,18 @@ const PaperGrid = ({ items, onSelect }: { items: Paper[]; onSelect: (paper: Pape
         </div>
 
         <div className="flex items-center justify-between pt-3 border-t-2 border-gray-100 mt-auto">
-           <div className="flex -space-x-2 overflow-hidden max-w-[50%]">
-              {paper.authors.slice(0, 3).map((author, i) => (
-                <div key={i} className="w-8 h-8 rounded-full border-2 border-black bg-white flex items-center justify-center text-xs font-bold shrink-0" title={author}>
-                  {author.charAt(0).toUpperCase()}
-                </div>
-              ))}
-              {paper.authors.length > 3 && (
-                <div className="w-8 h-8 rounded-full border-2 border-black bg-gray-200 flex items-center justify-center text-xs font-bold shrink-0">
-                  +{paper.authors.length - 3}
-                </div>
-              )}
-           </div>
+          <div className="flex -space-x-2 overflow-hidden max-w-[50%]">
+            {paper.authors.slice(0, 3).map((author, i) => (
+              <div key={i} className="w-8 h-8 rounded-full border-2 border-black bg-white flex items-center justify-center text-xs font-bold shrink-0" title={author}>
+                {author.charAt(0).toUpperCase()}
+              </div>
+            ))}
+            {paper.authors.length > 3 && (
+              <div className="w-8 h-8 rounded-full border-2 border-black bg-gray-200 flex items-center justify-center text-xs font-bold shrink-0">
+                +{paper.authors.length - 3}
+              </div>
+            )}
+          </div>
         </div>
 
         {(paper.organization?.name || paper.submittedBy?.name) && (
@@ -108,6 +124,14 @@ const PaperGrid = ({ items, onSelect }: { items: Paper[]; onSelect: (paper: Pape
           </div>
         )}
       </NeoCard>
+    </a>
+  );
+};
+
+const PaperGrid = ({ items, onSelect }: { items: Paper[]; onSelect: (paper: Paper) => void }) => (
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {items.map((paper) => (
+      <PaperCard key={paper.id} paper={paper} onSelect={onSelect} />
     ))}
   </div>
 );
@@ -176,109 +200,154 @@ const Container = ({
   };
 
   return (
-  <main className="max-w-7xl mx-auto p-4 md:p-8">
-    <div className="flex flex-col gap-3 mb-8">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-2">
-        <div>
-          <h2 className="text-4xl md:text-5xl font-black mb-1">Daily Papers</h2>
-          <p className="text-base text-gray-700 font-medium">
-            Quick date presets or pick a day to refresh the feed.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="neutral"
-              className="h-9 px-3 font-bold"
-              onClick={() => shift(-1)}
-              aria-label="Previous"
-            >
-              ←
-            </Button>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={"neutral"}
-                  className={cn(
-                    "w-[220px] justify-start text-left font-bold",
-                    !date && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {label}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={(d) => { setDate(d); setWeek(undefined); setMonth(undefined); }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-            <Button
-              variant="neutral"
-              className="h-9 px-3 font-bold"
-              onClick={() => shift(1)}
-              aria-label="Next"
-            >
-              →
-            </Button>
+    <main className="max-w-7xl mx-auto p-4 md:p-8">
+      <div className="flex flex-col gap-3 mb-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-2">
+          <div>
+            <h2 className="text-4xl md:text-5xl font-black mb-1">Daily Papers</h2>
+            <p className="text-base text-gray-700 font-medium">
+              Quick date presets or pick a day to refresh the feed.
+            </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant={date ? "default" : "neutral"}
-              className="h-9 px-3 font-bold"
-              onClick={() => { setDate(new Date()); setWeek(undefined); setMonth(undefined); }}
-            >
-              Today
-            </Button>
-            <Button
-              variant={week ? "default" : "neutral"}
-              className="h-9 px-3 font-bold"
-              onClick={() => { setWeek(format(new Date(), "yyyy-'W'II")); setMonth(undefined); setDate(undefined); }}
-            >
-              This Week
-            </Button>
-            <Button
-              variant={month ? "default" : "neutral"}
-              className="h-9 px-3 font-bold"
-              onClick={() => { setMonth(format(new Date(), 'yyyy-MM')); setWeek(undefined); setDate(undefined); }}
-            >
-              This Month
-            </Button>
-            <Button
-              variant="neutral"
-              className="h-9 px-3 font-bold"
-              onClick={() => { setWeek(undefined); setMonth(undefined); setDate(undefined); }}
-            >
-              Clear
-            </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="neutral"
+                className="h-9 px-3 font-bold"
+                onClick={() => shift(-1)}
+                aria-label="Previous"
+              >
+                ←
+              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"neutral"}
+                    className={cn(
+                      "w-[220px] justify-start text-left font-bold",
+                      !date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {label}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(d) => { setDate(d); setWeek(undefined); setMonth(undefined); }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button
+                variant="neutral"
+                className="h-9 px-3 font-bold"
+                onClick={() => shift(1)}
+                aria-label="Next"
+              >
+                →
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={date ? "default" : "neutral"}
+                className="h-9 px-3 font-bold"
+                onClick={() => { setDate(new Date()); setWeek(undefined); setMonth(undefined); }}
+              >
+                Today
+              </Button>
+              <Button
+                variant={week ? "default" : "neutral"}
+                className="h-9 px-3 font-bold"
+                onClick={() => { setWeek(format(new Date(), "yyyy-'W'II")); setMonth(undefined); setDate(undefined); }}
+              >
+                This Week
+              </Button>
+              <Button
+                variant={month ? "default" : "neutral"}
+                className="h-9 px-3 font-bold"
+                onClick={() => { setMonth(format(new Date(), 'yyyy-MM')); setWeek(undefined); setDate(undefined); }}
+              >
+                This Month
+              </Button>
+              <Button
+                variant="neutral"
+                className="h-9 px-3 font-bold"
+                onClick={() => { setWeek(undefined); setMonth(undefined); setDate(undefined); }}
+              >
+                Clear
+              </Button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-    {children}
-  </main>
+      {children}
+    </main>
   );
 };
 
 interface PaperListProps {
   onSelectPaper: (paper: Paper) => void;
+  onPapersLoaded?: (papers: Paper[]) => void;
 }
 
-export const PaperList: React.FC<PaperListProps> = ({ onSelectPaper }) => {
+// Helper to parse initial state from URL
+const getInitialFiltersFromURL = () => {
+  const params = new URLSearchParams(window.location.search);
+  const dateStr = params.get('date');
+  const week = params.get('week') || undefined;
+  const month = params.get('month') || undefined;
+
+  // Parse date or default to today
+  let date: Date | undefined;
+  if (dateStr) {
+    date = parse(dateStr, 'yyyy-MM-dd', new Date());
+  } else if (!week && !month) {
+    date = new Date(); // Default to today if no filters
+  }
+
+  return { date, week, month };
+};
+
+export const PaperList: React.FC<PaperListProps> = ({ onSelectPaper, onPapersLoaded }) => {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [date, setDate] = useState<Date | undefined>(new Date());
-  const [week, setWeek] = useState<string | undefined>();
-  const [month, setMonth] = useState<string | undefined>();
+
+  // Initialize from URL
+  const initialFilters = getInitialFiltersFromURL();
+  const [date, setDate] = useState<Date | undefined>(initialFilters.date);
+  const [week, setWeek] = useState<string | undefined>(initialFilters.week);
+  const [month, setMonth] = useState<string | undefined>(initialFilters.month);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Paper[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Sync filter state to URL (use replaceState so filters don't create history entries)
+  useEffect(() => {
+    const url = new URL(window.location.href);
+
+    // Clear old filter params
+    url.searchParams.delete('date');
+    url.searchParams.delete('week');
+    url.searchParams.delete('month');
+
+    // Set new filter params
+    if (date) {
+      url.searchParams.set('date', format(date, 'yyyy-MM-dd'));
+    } else if (week) {
+      url.searchParams.set('week', week);
+    } else if (month) {
+      url.searchParams.set('month', month);
+    }
+
+    // Use replaceState so filter changes don't add to history
+    window.history.replaceState(window.history.state, '', url.toString());
+  }, [date, week, month]);
 
   useEffect(() => {
     const loadPapers = async () => {
@@ -293,6 +362,7 @@ export const PaperList: React.FC<PaperListProps> = ({ onSelectPaper }) => {
           month,
         });
         setPapers(data);
+        onPapersLoaded?.(data);
       } catch (err: any) {
         console.error("PaperList load error:", err);
         setError(err.message || "Failed to load trending papers. Please try again later.");
@@ -302,7 +372,7 @@ export const PaperList: React.FC<PaperListProps> = ({ onSelectPaper }) => {
     };
 
     loadPapers();
-  }, [date, week, month]);
+  }, [date, week, month, onPapersLoaded]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -357,12 +427,12 @@ export const PaperList: React.FC<PaperListProps> = ({ onSelectPaper }) => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-             <div key={i} className="h-96 bg-gray-100 border-2 border-black shadow-neo animate-pulse p-6">
-               <div className="h-6 bg-gray-200 w-3/4 mb-4"></div>
-               <div className="h-4 bg-gray-200 w-full mb-2"></div>
-               <div className="h-4 bg-gray-200 w-full mb-2"></div>
-               <div className="h-4 bg-gray-200 w-1/2"></div>
-             </div>
+            <div key={i} className="h-96 bg-gray-100 border-2 border-black shadow-neo animate-pulse p-6">
+              <div className="h-6 bg-gray-200 w-3/4 mb-4"></div>
+              <div className="h-4 bg-gray-200 w-full mb-2"></div>
+              <div className="h-4 bg-gray-200 w-full mb-2"></div>
+              <div className="h-4 bg-gray-200 w-1/2"></div>
+            </div>
           ))}
         </div>
       </Container>
@@ -399,13 +469,13 @@ export const PaperList: React.FC<PaperListProps> = ({ onSelectPaper }) => {
           <div className="text-6xl mb-4">⚠️</div>
           <h2 className="text-3xl font-black mb-2">Connection Error</h2>
           <div className="bg-red-50 border-2 border-red-200 p-4 rounded mb-6 max-w-2xl overflow-auto">
-              <p className="text-red-800 font-mono text-sm whitespace-pre-wrap">{error}</p>
+            <p className="text-red-800 font-mono text-sm whitespace-pre-wrap">{error}</p>
           </div>
           <p className="text-lg text-gray-600 mb-6">
-              If you are seeing a CORS error (Failed to fetch), the Hugging Face API might be blocking direct browser requests from this domain.
+            If you are seeing a CORS error (Failed to fetch), the Hugging Face API might be blocking direct browser requests from this domain.
           </p>
-          <Button 
-            onClick={() => window.location.reload()} 
+          <Button
+            onClick={() => window.location.reload()}
             variant="default"
             className="px-6 py-3 font-bold"
           >
