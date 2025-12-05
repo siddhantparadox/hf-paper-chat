@@ -27,12 +27,23 @@ export interface Paper {
   imageUrl?: string;
 }
 
+export type ChatRole = "user" | "assistant" | "system";
+
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'model';
-  text: string;
-  timestamp: number;
-  isThinking?: boolean;
+  role: ChatRole;
+  content: string;
+  createdAt: string;
+  isThinking?: boolean; // UI-only state for streaming
+}
+
+export interface Conversation {
+  id: string;
+  paperId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: ChatMessage[];
 }
 
 export enum ViewState {

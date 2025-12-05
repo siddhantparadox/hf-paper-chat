@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Paper, ChatMessage } from '../types';
+import { Paper, Conversation } from '../types';
 import { NeoButton } from './NeoButton';
-import { streamMessageToChat } from '../services/aiService';
 import { Streamdown } from 'streamdown';
 import { fetchPaperDetails, fetchPaperRepos, HFPaperRepos } from '../services/hfService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
@@ -10,30 +9,32 @@ import { Github, Link2, MessageCircle, Star, ThumbsUp } from 'lucide-react';
 
 interface PaperDetailProps {
   paper: Paper;
+  conversation: Conversation;
+  onSendMessage: (input: string) => Promise<void>;
   onBack: () => void;
 }
 
 const ResourceSection = ({ title, items, type }: { title: string, items: any[], type: 'model' | 'dataset' | 'space' }) => {
   if (items.length === 0) return null;
-  
+
   const limit = 4;
   const displayedItems = items.slice(0, limit);
   const hasMore = items.length > limit;
 
   const renderItem = (item: any) => {
-     const url = type === 'model' ? `https://huggingface.co/${item.id}` 
-               : type === 'dataset' ? `https://huggingface.co/datasets/${item.id}`
-               : `https://huggingface.co/spaces/${item.id}`;
-     const icon = type === 'model' ? '📦' : type === 'dataset' ? '📊' : '🚀';
-     
-     return (
-        <a key={item.id} href={url} target="_blank" rel="noreferrer" className="group block w-full sm:w-auto">
-           <div className="border-2 border-black px-4 py-2 bg-white group-hover:bg-gray-50 group-hover:-translate-y-0.5 shadow-neo-sm transition-all text-sm font-bold flex items-center gap-2">
-              {icon} <span className="truncate max-w-[200px]">{item.id}</span> 
-              <span className="text-xs font-normal text-gray-500 border-l-2 border-gray-200 pl-2 ml-1">❤️ {item.likes}</span>
-           </div>
-        </a>
-     );
+    const url = type === 'model' ? `https://huggingface.co/${item.id}`
+      : type === 'dataset' ? `https://huggingface.co/datasets/${item.id}`
+        : `https://huggingface.co/spaces/${item.id}`;
+    const icon = type === 'model' ? '📦' : type === 'dataset' ? '📊' : '🚀';
+
+    return (
+      <a key={item.id} href={url} target="_blank" rel="noreferrer" className="group block w-full sm:w-auto">
+        <div className="border-2 border-black px-4 py-2 bg-white group-hover:bg-gray-50 group-hover:-translate-y-0.5 shadow-neo-sm transition-all text-sm font-bold flex items-center gap-2">
+          {icon} <span className="truncate max-w-[200px]">{item.id}</span>
+          <span className="text-xs font-normal text-gray-500 border-l-2 border-gray-200 pl-2 ml-1">❤️ {item.likes}</span>
+        </div>
+      </a>
+    );
   };
 
   return (
@@ -41,36 +42,38 @@ const ResourceSection = ({ title, items, type }: { title: string, items: any[], 
       <h5 className="font-bold text-sm uppercase tracking-wider text-gray-500 mb-3">{title}</h5>
       <div className="flex flex-wrap gap-3">
         {displayedItems.map(renderItem)}
-        
+
         {hasMore && (
-           <Dialog>
-             <DialogTrigger asChild>
-               <Button variant="neutral" className="h-auto py-2 px-4 font-bold">
-                 Show {items.length - limit} more...
-               </Button>
-             </DialogTrigger>
-             <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-               <DialogHeader>
-                 <DialogTitle className="text-2xl font-black mb-4">All {title} ({items.length})</DialogTitle>
-               </DialogHeader>
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                 {items.map(renderItem)}
-               </div>
-             </DialogContent>
-           </Dialog>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="neutral" className="h-auto py-2 px-4 font-bold">
+                Show {items.length - limit} more...
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-black mb-4">All {title} ({items.length})</DialogTitle>
+              </DialogHeader>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {items.map(renderItem)}
+              </div>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
     </div>
   );
 };
 
-export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, onBack }) => {
+export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, conversation, onSendMessage, onBack }) => {
   const [paper, setPaper] = useState<Paper>(initialPaper);
   const [repos, setRepos] = useState<HFPaperRepos>({ models: [], datasets: [], spaces: [] });
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Get messages from conversation prop
+  const messages = conversation.messages;
 
   // Enrich paper details and fetch repos on mount
   useEffect(() => {
@@ -88,7 +91,7 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, o
         organization: details.organization ?? prev.organization,
       }));
     };
-    
+
     const loadRepos = async () => {
       const data = await fetchPaperRepos(initialPaper.id);
       setRepos(data);
@@ -98,19 +101,7 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, o
     loadRepos();
   }, [initialPaper.id]);
 
-  // Initialize chat on mount
-  useEffect(() => {
-    setMessages([
-      {
-        id: 'intro',
-        role: 'model',
-        text: `Hi! I'm ready to discuss "**${paper.title}**". \n\nAsk me anything about the methodology, results, or abstract!`,
-        timestamp: Date.now(),
-      }
-    ]);
-  }, [paper.id, paper.title]);
-
-  // Scroll to bottom
+  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -118,67 +109,12 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, o
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return;
 
-    const userMsg: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      text: inputValue,
-      timestamp: Date.now()
-    };
-
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+    const input = inputValue;
     setInputValue('');
     setIsLoading(true);
 
-    const botMsgId = (Date.now() + 1).toString();
-    let isFirstChunk = true;
-
     try {
-      // Pass the updated history including the new user message
-      const stream = streamMessageToChat(newMessages, paper);
-
-      for await (const chunk of stream) {
-        if (isFirstChunk) {
-          isFirstChunk = false;
-          setMessages(prev => [...prev, {
-            id: botMsgId,
-            role: 'model',
-            text: chunk,
-            timestamp: Date.now(),
-            isThinking: true
-          }]);
-        } else {
-          setMessages(prev => prev.map(msg =>
-            msg.id === botMsgId
-              ? { ...msg, text: msg.text + chunk }
-              : msg
-          ));
-        }
-      }
-
-      setMessages(prev => prev.map(msg =>
-        msg.id === botMsgId
-          ? { ...msg, isThinking: false }
-          : msg
-      ));
-
-    } catch (e: any) {
-      console.error(e);
-      const errorMessage = e.message || "Sorry, I encountered an error processing your request.";
-      if (isFirstChunk) {
-        setMessages(prev => [...prev, {
-          id: botMsgId,
-          role: 'model',
-          text: `**System Error:**\n${errorMessage}`,
-          timestamp: Date.now()
-        }]);
-      } else {
-        setMessages(prev => prev.map(msg =>
-          msg.id === botMsgId
-            ? { ...msg, text: msg.text + `\n\n**System Error:** ${errorMessage}`, isThinking: false }
-            : msg
-        ));
-      }
+      await onSendMessage(input);
     } finally {
       setIsLoading(false);
     }
@@ -381,7 +317,7 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, o
                   {msg.role === 'user' ? 'You' : 'Gemini 2.5 Flash'}
                 </div>
                 <div className="markdown-body prose prose-sm max-w-none break-words">
-                  <Streamdown isAnimating={msg.isThinking}>{msg.text || ''}</Streamdown>
+                  <Streamdown isAnimating={msg.isThinking}>{msg.content || ''}</Streamdown>
                 </div>
               </div>
             </div>

@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
 import { PaperList } from './components/PaperList';
 import { PaperDetail } from './components/PaperDetail';
-import { Paper, ViewState } from './types';
+import { Paper, ViewState, Conversation, ChatMessage } from './types';
 import { getPaperById } from './services/hfService';
+import { streamMessageToChat } from './services/aiService';
 
 interface HistoryState {
   view: ViewState;
@@ -15,6 +16,10 @@ const App: React.FC = () => {
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
   const [papers, setPapers] = useState<Paper[]>([]);
   const [isLoadingPaper, setIsLoadingPaper] = useState(false);
+
+  // Conversation state - keyed by paper ID
+  const [conversationsByPaper, setConversationsByPaper] = useState<Record<string, Conversation>>({});
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
   // Parse URL and set initial state
   const parseURLState = useCallback(() => {
@@ -96,7 +101,35 @@ const App: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [loadPaperById]);
 
+  // Create or get conversation for a paper
+  const getOrCreateConversation = useCallback((paper: Paper): Conversation => {
+    let conv = conversationsByPaper[paper.id];
+    if (!conv) {
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      conv = {
+        id,
+        paperId: paper.id,
+        title: paper.title,
+        createdAt: now,
+        updatedAt: now,
+        messages: [
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            createdAt: now,
+            content: `Hi! I'm ready to discuss "**${paper.title}**". \n\nAsk me anything about the methodology, results, or abstract!`
+          }
+        ]
+      };
+      setConversationsByPaper(prev => ({ ...prev, [paper.id]: conv! }));
+    }
+    return conv;
+  }, [conversationsByPaper]);
+
   const handleSelectPaper = useCallback((paper: Paper) => {
+    const conv = getOrCreateConversation(paper);
+    setActiveConversationId(conv.id);
     setSelectedPaper(paper);
     setView(ViewState.PAPER_DETAIL);
 
@@ -107,7 +140,143 @@ const App: React.FC = () => {
     const state: HistoryState = { view: ViewState.PAPER_DETAIL, paperId: paper.id };
     window.history.pushState(state, '', url.toString());
     window.scrollTo(0, 0);
-  }, []);
+  }, [getOrCreateConversation]);
+
+  // Handle sending a message in the chat
+  const handleSendMessage = useCallback(async (input: string) => {
+    if (!selectedPaper || !activeConversationId) return;
+
+    const now = new Date().toISOString();
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: input,
+      createdAt: now
+    };
+
+    // Add user message to conversation
+    setConversationsByPaper(prev => {
+      const conv = prev[selectedPaper.id];
+      if (!conv) return prev;
+      return {
+        ...prev,
+        [selectedPaper.id]: {
+          ...conv,
+          updatedAt: now,
+          messages: [...conv.messages, userMsg]
+        }
+      };
+    });
+
+    const botMsgId = crypto.randomUUID();
+    let isFirstChunk = true;
+
+    try {
+      // Get current messages including the new user message
+      const currentConv = conversationsByPaper[selectedPaper.id];
+      const messagesForApi = currentConv ? [...currentConv.messages, userMsg] : [userMsg];
+
+      const stream = streamMessageToChat(messagesForApi, selectedPaper);
+
+      for await (const chunk of stream) {
+        if (isFirstChunk) {
+          isFirstChunk = false;
+          // Add assistant message placeholder
+          setConversationsByPaper(prev => {
+            const conv = prev[selectedPaper.id];
+            if (!conv) return prev;
+            return {
+              ...prev,
+              [selectedPaper.id]: {
+                ...conv,
+                messages: [...conv.messages, {
+                  id: botMsgId,
+                  role: 'assistant',
+                  content: chunk,
+                  createdAt: new Date().toISOString(),
+                  isThinking: true
+                }]
+              }
+            };
+          });
+        } else {
+          // Append to existing assistant message
+          setConversationsByPaper(prev => {
+            const conv = prev[selectedPaper.id];
+            if (!conv) return prev;
+            return {
+              ...prev,
+              [selectedPaper.id]: {
+                ...conv,
+                messages: conv.messages.map(msg =>
+                  msg.id === botMsgId
+                    ? { ...msg, content: msg.content + chunk }
+                    : msg
+                )
+              }
+            };
+          });
+        }
+      }
+
+      // Mark streaming as complete
+      setConversationsByPaper(prev => {
+        const conv = prev[selectedPaper.id];
+        if (!conv) return prev;
+        return {
+          ...prev,
+          [selectedPaper.id]: {
+            ...conv,
+            updatedAt: new Date().toISOString(),
+            messages: conv.messages.map(msg =>
+              msg.id === botMsgId
+                ? { ...msg, isThinking: false }
+                : msg
+            )
+          }
+        };
+      });
+
+    } catch (e: any) {
+      console.error(e);
+      const errorMessage = e.message || "Sorry, I encountered an error processing your request.";
+
+      if (isFirstChunk) {
+        setConversationsByPaper(prev => {
+          const conv = prev[selectedPaper.id];
+          if (!conv) return prev;
+          return {
+            ...prev,
+            [selectedPaper.id]: {
+              ...conv,
+              messages: [...conv.messages, {
+                id: botMsgId,
+                role: 'assistant',
+                content: `**System Error:**\n${errorMessage}`,
+                createdAt: new Date().toISOString()
+              }]
+            }
+          };
+        });
+      } else {
+        setConversationsByPaper(prev => {
+          const conv = prev[selectedPaper.id];
+          if (!conv) return prev;
+          return {
+            ...prev,
+            [selectedPaper.id]: {
+              ...conv,
+              messages: conv.messages.map(msg =>
+                msg.id === botMsgId
+                  ? { ...msg, content: msg.content + `\n\n**System Error:** ${errorMessage}`, isThinking: false }
+                  : msg
+              )
+            }
+          };
+        });
+      }
+    }
+  }, [selectedPaper, activeConversationId, conversationsByPaper]);
 
   const handleGoHome = useCallback(() => {
     setSelectedPaper(null);
@@ -126,6 +295,9 @@ const App: React.FC = () => {
     setPapers(loadedPapers);
   }, []);
 
+  // Get current conversation for selected paper
+  const currentConversation = selectedPaper ? conversationsByPaper[selectedPaper.id] : null;
+
   return (
     <div className="min-h-screen flex flex-col font-sans text-black">
       <Header
@@ -138,8 +310,13 @@ const App: React.FC = () => {
         <PaperList onSelectPaper={handleSelectPaper} onPapersLoaded={handlePapersLoaded} />
       )}
 
-      {view === ViewState.PAPER_DETAIL && selectedPaper && (
-        <PaperDetail paper={selectedPaper} onBack={handleGoHome} />
+      {view === ViewState.PAPER_DETAIL && selectedPaper && currentConversation && (
+        <PaperDetail
+          paper={selectedPaper}
+          conversation={currentConversation}
+          onSendMessage={handleSendMessage}
+          onBack={handleGoHome}
+        />
       )}
 
       {isLoadingPaper && (

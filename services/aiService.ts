@@ -33,13 +33,15 @@ export const createSystemInstruction = (paper: Paper): string => {
 export const streamMessageToChat = async function* (messages: ChatMessage[], paper: Paper) {
   try {
     const systemInstruction = createSystemInstruction(paper);
-    
+
     const apiMessages = [
       { role: "system", content: systemInstruction },
-      ...messages.map(m => ({
-        role: m.role === 'model' ? 'assistant' : 'user',
-        content: m.text
-      }))
+      ...messages
+        .filter(m => m.role !== 'system') // System message is generated dynamically
+        .map(m => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content
+        }))
     ] as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
 
     const stream = await openai.chat.completions.create({

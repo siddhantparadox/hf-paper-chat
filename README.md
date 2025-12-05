@@ -4,10 +4,11 @@ A modern, brutalist-designed chat interface for discussing ArXiv papers, powered
 
 ## Features
 
-- **Paper Discovery**: Browse trending papers from Hugging Face Daily Papers.
-- **Interactive Chat**: Discuss papers with an AI assistant that has context about the paper's abstract.
+- **Paper Discovery**: Browse trending papers from Hugging Face Daily Papers with date filtering.
+- **Multi-Turn Chat**: Have full conversations about papers with context-aware AI. History persists per paper.
+- **Interactive Assistant**: AI has context about the paper's title, authors, and abstract.
 - **Brutalist Design**: A unique, high-contrast aesthetic using "Neo-Brutalism" principles.
-- **Streaming Responses**: Real-time AI responses.
+- **Streaming Responses**: Real-time AI responses with animated markdown rendering.
 
 ## Tech Stack
 
