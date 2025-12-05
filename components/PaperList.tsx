@@ -237,6 +237,7 @@ const Container = ({
                     mode="single"
                     selected={date}
                     onSelect={(d) => { setDate(d); setWeek(undefined); setMonth(undefined); }}
+                    disabled={{ after: new Date() }}
                     initialFocus
                   />
                 </PopoverContent>
