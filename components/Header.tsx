@@ -7,9 +7,10 @@ interface HeaderProps {
   currentView: ViewState;
   onHomeClick: () => void;
   onPaperSubmit: (paper: Paper) => void;
+  onSignOut?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentView, onHomeClick, onPaperSubmit }) => {
+export const Header: React.FC<HeaderProps> = ({ currentView, onHomeClick, onPaperSubmit, onSignOut }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -63,6 +64,11 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onHomeClick, onPape
           </div>
           
           <div className="flex gap-4">
+            {onSignOut && (
+              <NeoButton variant="secondary" onClick={onSignOut}>
+                Sign Out
+              </NeoButton>
+            )}
             {currentView === ViewState.PAPER_DETAIL && (
               <NeoButton onClick={onHomeClick} variant="secondary" className="hidden sm:flex">
                 Back to Feed

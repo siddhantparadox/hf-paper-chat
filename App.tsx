@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from './convex/_generated/api';
 import type { Id } from './convex/_generated/dataModel';
+import { useAuthActions } from '@convex-dev/auth/react';
 import { Header } from './components/Header';
 import { PaperList } from './components/PaperList';
 import { PaperDetail } from './components/PaperDetail';
@@ -14,8 +15,6 @@ interface HistoryState {
   paperId?: string;
 }
 
-const LOCAL_USER_ID = 'local-dev-user';
-
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(ViewState.HOME);
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
@@ -26,13 +25,15 @@ const App: React.FC = () => {
   const [streamingAssistantMessage, setStreamingAssistantMessage] = useState<ChatMessage | null>(null);
   const creatingConversationForPaperId = useRef<string | null>(null);
 
-  const conversationsForUser = useQuery(api.conversations.listForUser, { userId: LOCAL_USER_ID });
+  const conversationsForUser = useQuery(api.conversations.listForUser);
   const createConversation = useMutation(api.conversations.create);
   const appendMessages = useMutation(api.conversations.appendMessages);
+  const { signOut } = useAuthActions();
+  const handleSignOut = useCallback(() => void signOut(), [signOut]);
 
   const conversationForPaper = useQuery(
     api.conversations.getForUserAndPaper,
-    selectedPaper ? { userId: LOCAL_USER_ID, paperId: selectedPaper.id } : "skip",
+    selectedPaper ? { paperId: selectedPaper.id } : "skip",
   );
 
   const conversationWithMessages = useQuery(
@@ -171,7 +172,6 @@ const App: React.FC = () => {
     void (async () => {
       try {
         const conversationId = await createConversation({
-          userId: LOCAL_USER_ID,
           paperId,
           paperTitle: selectedPaper.title,
         });
@@ -333,6 +333,7 @@ const App: React.FC = () => {
         currentView={view}
         onHomeClick={handleGoHome}
         onPaperSubmit={handleSelectPaper}
+        onSignOut={handleSignOut}
       />
 
       {view === ViewState.HOME && (

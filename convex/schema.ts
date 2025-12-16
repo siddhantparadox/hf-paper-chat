@@ -1,9 +1,11 @@
 import { defineSchema, defineTable } from "convex/server";
+import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 
 const schema = defineSchema({
+  ...authTables,
   conversations: defineTable({
-    userId: v.optional(v.string()), // will be filled once auth exists
+    userId: v.string(),
     paperId: v.string(),
     paperTitle: v.string(),
     createdAt: v.string(),

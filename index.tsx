@@ -2,7 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { ConvexReactClient } from "convex/react";
+import { ConvexAuthProvider } from "@convex-dev/auth/react";
+import { AuthGate } from "./components/AuthGate";
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {
@@ -18,8 +20,10 @@ const convex = new ConvexReactClient(convexUrl);
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <ConvexProvider client={convex}>
-      <App />
-    </ConvexProvider>
+    <ConvexAuthProvider client={convex}>
+      <AuthGate>
+        <App />
+      </AuthGate>
+    </ConvexAuthProvider>
   </React.StrictMode>
 );
