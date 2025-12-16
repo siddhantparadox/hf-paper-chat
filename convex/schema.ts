@@ -1,0 +1,23 @@
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+
+const schema = defineSchema({
+  conversations: defineTable({
+    userId: v.optional(v.string()), // will be filled once auth exists
+    paperId: v.string(),
+    paperTitle: v.string(),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_paper", ["paperId", "userId"]),
+
+  messages: defineTable({
+    conversationId: v.id("conversations"),
+    role: v.string(), // "user" | "assistant" | "system"
+    content: v.string(),
+    createdAt: v.string(),
+  }).index("by_conversation", ["conversationId"]),
+});
+
+export default schema;
