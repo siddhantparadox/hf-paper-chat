@@ -10,15 +10,58 @@ async function requireUserId(ctx: { auth: any }) {
   return userId;
 }
 
+async function findLastUserMessageAt(ctx: any, conversationId: any): Promise<string | null> {
+  const recent = await ctx.db
+    .query("messages")
+    .withIndex("by_conversation", (q: any) => q.eq("conversationId", conversationId))
+    .order("desc")
+    .take(50);
+  const lastUser = recent.find((msg: any) => msg.role === "user");
+  return lastUser ? lastUser.createdAt : null;
+}
+
 export const listForUser = query({
   args: {},
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
-    return await ctx.db
+    const started = await ctx.db
       .query("conversations")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user_lastUserMessageAt", (q) =>
+        q.eq("userId", userId).gt("lastUserMessageAt", undefined),
+      )
       .order("desc")
       .take(50);
+
+    const missingLastUserMessageAt = await ctx.db
+      .query("conversations")
+      .withIndex("by_user_lastUserMessageAt", (q) =>
+        q.eq("userId", userId).eq("lastUserMessageAt", undefined),
+      )
+      .order("desc")
+      .take(50);
+
+    const backfilled = [];
+    for (const conv of missingLastUserMessageAt) {
+      const lastUserMessageAt = await findLastUserMessageAt(ctx, conv._id);
+      if (!lastUserMessageAt) continue;
+      backfilled.push({
+        _id: conv._id,
+        paperId: conv.paperId,
+        paperTitle: conv.paperTitle,
+        lastUserMessageAt,
+      });
+    }
+
+    const normalized = started.map((conv) => ({
+      _id: conv._id,
+      paperId: conv.paperId,
+      paperTitle: conv.paperTitle,
+      lastUserMessageAt: conv.lastUserMessageAt!,
+    }));
+
+    return [...normalized, ...backfilled]
+      .sort((a, b) => b.lastUserMessageAt.localeCompare(a.lastUserMessageAt))
+      .slice(0, 50);
   },
 });
 
@@ -42,11 +85,24 @@ export const getForUserAndPaper = query({
   args: { paperId: v.string() },
   handler: async (ctx, { paperId }) => {
     const userId = await requireUserId(ctx);
-    return await ctx.db
+    const candidates = await ctx.db
       .query("conversations")
       .withIndex("by_paper", (q) => q.eq("paperId", paperId).eq("userId", userId))
       .order("desc")
-      .first();
+      .take(10);
+
+    let best: any = null;
+    let bestLastUserMessageAt: string | null = null;
+    for (const conv of candidates) {
+      const lastUserMessageAt = conv.lastUserMessageAt ?? (await findLastUserMessageAt(ctx, conv._id));
+      if (!lastUserMessageAt) continue;
+      if (!bestLastUserMessageAt || lastUserMessageAt > bestLastUserMessageAt) {
+        best = conv;
+        bestLastUserMessageAt = lastUserMessageAt;
+      }
+    }
+
+    return best;
   },
 });
 
@@ -90,6 +146,7 @@ export const appendMessages = mutation({
     }
 
     const now = new Date().toISOString();
+    const hasUserMessage = messages.some((msg) => msg.role === "user");
     for (const msg of messages) {
       await ctx.db.insert("messages", {
         conversationId,
@@ -97,6 +154,8 @@ export const appendMessages = mutation({
         ...msg,
       });
     }
-    await ctx.db.patch(conversationId, { updatedAt: now });
+    if (hasUserMessage) {
+      await ctx.db.patch(conversationId, { updatedAt: now, lastUserMessageAt: now });
+    }
   },
 });

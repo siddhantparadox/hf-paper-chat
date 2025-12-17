@@ -10,8 +10,10 @@ const schema = defineSchema({
     paperTitle: v.string(),
     createdAt: v.string(),
     updatedAt: v.string(),
+    lastUserMessageAt: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
+    .index("by_user_lastUserMessageAt", ["userId", "lastUserMessageAt"])
     .index("by_paper", ["paperId", "userId"]),
 
   messages: defineTable({

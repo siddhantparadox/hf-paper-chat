@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from './convex/_generated/api';
 import type { Id } from './convex/_generated/dataModel';
 import { useAuthActions } from '@convex-dev/auth/react';
 import { Header } from './components/Header';
+import { ConversationSidebar } from './components/ConversationSidebar';
 import { PaperList } from './components/PaperList';
 import { PaperDetail } from './components/PaperDetail';
 import { Paper, ViewState, Conversation, ChatMessage } from './types';
@@ -15,6 +16,10 @@ interface HistoryState {
   paperId?: string;
 }
 
+function buildGreeting(paperTitle: string) {
+  return `Hi! I'm ready to discuss "**${paperTitle}**". \n\nAsk me anything about the methodology, results, or abstract!`;
+}
+
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(ViewState.HOME);
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
@@ -23,9 +28,8 @@ const App: React.FC = () => {
 
   const [activeConversationId, setActiveConversationId] = useState<Id<'conversations'> | null>(null);
   const [streamingAssistantMessage, setStreamingAssistantMessage] = useState<ChatMessage | null>(null);
-  const creatingConversationForPaperId = useRef<string | null>(null);
+  const [optimisticUserMessage, setOptimisticUserMessage] = useState<ChatMessage | null>(null);
 
-  const conversationsForUser = useQuery(api.conversations.listForUser);
   const createConversation = useMutation(api.conversations.create);
   const appendMessages = useMutation(api.conversations.appendMessages);
   const { signOut } = useAuthActions();
@@ -49,33 +53,39 @@ const App: React.FC = () => {
   }, []);
 
   // Load paper by ID (from URL or cache)
-  const loadPaperById = useCallback(async (paperId: string) => {
-    setActiveConversationId(null);
-    setStreamingAssistantMessage(null);
-
-    // First try to find in loaded papers
-    const cachedPaper = papers.find(p => p.id === paperId);
-    if (cachedPaper) {
-      setSelectedPaper(cachedPaper);
-      setView(ViewState.PAPER_DETAIL);
-      return;
-    }
-
-    // Fetch from API
-    setIsLoadingPaper(true);
-    try {
-      const fetchedPaper = await getPaperById(paperId);
-      setSelectedPaper(fetchedPaper);
-      setView(ViewState.PAPER_DETAIL);
-    } catch (err) {
-      console.error('Failed to fetch paper:', err);
-      // Go back to home on error
-      setView(ViewState.HOME);
+  const loadPaperById = useCallback(
+    async (paperId: string, options?: { conversationId?: Id<'conversations'> | null }) => {
+      const nextConversationId = options?.conversationId ?? null;
+      setActiveConversationId(nextConversationId);
+      setStreamingAssistantMessage(null);
+      setOptimisticUserMessage(null);
       setSelectedPaper(null);
-    } finally {
-      setIsLoadingPaper(false);
-    }
-  }, [papers]);
+      setView(ViewState.PAPER_DETAIL);
+
+      // First try to find in loaded papers
+      const cachedPaper = papers.find((p) => p.id === paperId);
+      if (cachedPaper) {
+        setSelectedPaper(cachedPaper);
+        return;
+      }
+
+      // Fetch from API
+      setIsLoadingPaper(true);
+      try {
+        const fetchedPaper = await getPaperById(paperId);
+        setSelectedPaper(fetchedPaper);
+      } catch (err) {
+        console.error('Failed to fetch paper:', err);
+        // Go back to home on error
+        setView(ViewState.HOME);
+        setSelectedPaper(null);
+        setActiveConversationId(null);
+      } finally {
+        setIsLoadingPaper(false);
+      }
+    },
+    [papers],
+  );
 
   // Handle initial URL state on mount
   useEffect(() => {
@@ -131,6 +141,7 @@ const App: React.FC = () => {
   const handleSelectPaper = useCallback((paper: Paper) => {
     setActiveConversationId(null);
     setStreamingAssistantMessage(null);
+    setOptimisticUserMessage(null);
     setSelectedPaper(paper);
     setView(ViewState.PAPER_DETAIL);
 
@@ -143,70 +154,61 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   }, []);
 
-  const openPaperById = useCallback((paperId: string) => {
-    // Build new URL preserving existing filter params
-    const url = new URL(window.location.href);
-    url.searchParams.set('paperId', paperId);
+  const handleSelectConversation = useCallback(
+    (conversationId: Id<'conversations'>, paperId: string) => {
+      // Build new URL preserving existing filter params
+      const url = new URL(window.location.href);
+      url.searchParams.set('paperId', paperId);
 
-    const state: HistoryState = { view: ViewState.PAPER_DETAIL, paperId };
-    window.history.pushState(state, '', url.toString());
-    window.scrollTo(0, 0);
+      const state: HistoryState = { view: ViewState.PAPER_DETAIL, paperId };
+      window.history.pushState(state, '', url.toString());
+      window.scrollTo(0, 0);
 
-    loadPaperById(paperId);
-  }, [loadPaperById]);
+      if (selectedPaper?.id === paperId) {
+        setActiveConversationId(conversationId);
+        setStreamingAssistantMessage(null);
+        setOptimisticUserMessage(null);
+        setView(ViewState.PAPER_DETAIL);
+        return;
+      }
+
+      void loadPaperById(paperId, { conversationId });
+    },
+    [loadPaperById, selectedPaper],
+  );
 
   useEffect(() => {
     if (!selectedPaper) return;
+    if (activeConversationId) return;
     if (conversationForPaper === undefined) return;
 
     if (conversationForPaper) {
       setActiveConversationId(conversationForPaper._id);
-      return;
-    }
-
-    const paperId = selectedPaper.id;
-    if (creatingConversationForPaperId.current === paperId) return;
-    creatingConversationForPaperId.current = paperId;
-
-    let canceled = false;
-    void (async () => {
-      try {
-        const conversationId = await createConversation({
-          paperId,
-          paperTitle: selectedPaper.title,
-        });
-        await appendMessages({
-          conversationId,
-          messages: [
-            {
-              role: 'assistant',
-              content: `Hi! I'm ready to discuss "**${selectedPaper.title}**". \n\nAsk me anything about the methodology, results, or abstract!`,
-            },
-          ],
-        });
-        if (!canceled) setActiveConversationId(conversationId);
-      } catch (err) {
-        console.error('Failed to create conversation:', err);
-      } finally {
-        if (creatingConversationForPaperId.current === paperId) {
-          creatingConversationForPaperId.current = null;
-        }
-      }
-    })();
-
-    return () => {
-      canceled = true;
-      if (creatingConversationForPaperId.current === paperId) {
-        creatingConversationForPaperId.current = null;
-      }
     };
-  }, [selectedPaper, conversationForPaper, createConversation, appendMessages]);
+  }, [selectedPaper, activeConversationId, conversationForPaper]);
 
   // Handle sending a message in the chat
   const handleSendMessage = useCallback(async (input: string) => {
-    if (!selectedPaper || !activeConversationId) return;
+    if (!selectedPaper) return;
 
     const now = new Date().toISOString();
+    setOptimisticUserMessage({
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: input,
+      createdAt: now,
+    });
+
+    let conversationId = activeConversationId;
+    const isNewConversation = !conversationId;
+    if (!conversationId) {
+      conversationId = await createConversation({
+        paperId: selectedPaper.id,
+        paperTitle: selectedPaper.title,
+      });
+      setActiveConversationId(conversationId);
+    }
+
     const existingMessages: ChatMessage[] = (conversationWithMessages?.messages ?? []).map((msg) => ({
       id: msg._id,
       role: msg.role as ChatMessage['role'],
@@ -215,8 +217,13 @@ const App: React.FC = () => {
     }));
 
     await appendMessages({
-      conversationId: activeConversationId,
-      messages: [{ role: 'user', content: input }],
+      conversationId,
+      messages: isNewConversation
+        ? [
+          { role: 'assistant', content: buildGreeting(selectedPaper.title) },
+          { role: 'user', content: input },
+        ]
+        : [{ role: 'user', content: input }],
     });
 
     const localAssistantMessageId = crypto.randomUUID();
@@ -258,10 +265,10 @@ const App: React.FC = () => {
     );
 
     await appendMessages({
-      conversationId: activeConversationId,
+      conversationId,
       messages: [{ role: 'assistant', content: assistantContent }],
     });
-  }, [selectedPaper, activeConversationId, conversationWithMessages, appendMessages]);
+  }, [selectedPaper, activeConversationId, conversationWithMessages, createConversation, appendMessages]);
 
   useEffect(() => {
     if (!streamingAssistantMessage || streamingAssistantMessage.isThinking) return;
@@ -281,6 +288,7 @@ const App: React.FC = () => {
     setSelectedPaper(null);
     setActiveConversationId(null);
     setStreamingAssistantMessage(null);
+    setOptimisticUserMessage(null);
     setView(ViewState.HOME);
 
     // Remove paperId but preserve filter params (date, week, month)
@@ -326,75 +334,70 @@ const App: React.FC = () => {
       messages: messagesForUi,
     }
     : null;
+  const conversationForUi: Conversation | null = useMemo(() => {
+    if (currentConversation) return currentConversation;
+    if (!selectedPaper) return null;
+    const now = new Date().toISOString();
+    const messages: ChatMessage[] = [
+      {
+        id: 'greeting',
+        role: 'assistant',
+        content: buildGreeting(selectedPaper.title),
+        createdAt: now,
+      },
+    ];
+    if (optimisticUserMessage) messages.push(optimisticUserMessage);
+    if (streamingAssistantMessage) messages.push(streamingAssistantMessage);
+
+    return {
+      id: activeConversationId ?? 'draft',
+      paperId: selectedPaper.id,
+      title: selectedPaper.title,
+      createdAt: now,
+      updatedAt: now,
+      messages,
+    };
+  }, [currentConversation, selectedPaper, activeConversationId, optimisticUserMessage, streamingAssistantMessage]);
 
   return (
-    <div className="min-h-screen flex flex-col font-sans text-black">
-      <Header
-        currentView={view}
-        onHomeClick={handleGoHome}
-        onPaperSubmit={handleSelectPaper}
-        onSignOut={handleSignOut}
-      />
+    <div className="flex h-screen font-sans text-black">
+      <aside className="border-r-2 border-black bg-white flex flex-col shrink-0">
+        <ConversationSidebar
+          activeConversationId={activeConversationId}
+          onSelectConversation={handleSelectConversation}
+        />
+      </aside>
 
-      {view === ViewState.HOME && (
-        <>
-          <div className="border-b-2 border-black bg-white">
-            <div className="max-w-7xl mx-auto px-4 py-4">
-              <h2 className="text-lg font-black mb-3">Recent Chats</h2>
-              {conversationsForUser === undefined ? (
-                <p className="text-sm font-medium text-gray-600">Loading conversations...</p>
-              ) : conversationsForUser.length === 0 ? (
-                <p className="text-sm font-medium text-gray-600">
-                  No conversations yet. Open a paper to start one.
-                </p>
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {conversationsForUser.slice(0, 6).map((conv) => (
-                    <button
-                      key={conv._id}
-                      onClick={() => openPaperById(conv.paperId)}
-                      className="text-left border-2 border-black bg-white shadow-neo-sm hover:bg-gray-50 transition-colors p-4"
-                    >
-                      <div className="font-bold truncate" title={conv.paperTitle}>
-                        {conv.paperTitle}
-                      </div>
-                      <div className="text-xs font-bold text-gray-500 mt-2">ARXIV: {conv.paperId}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
+      <main className="flex-1 min-w-0 overflow-y-auto flex flex-col">
+        <Header
+          currentView={view}
+          onHomeClick={handleGoHome}
+          onPaperSubmit={handleSelectPaper}
+          onSignOut={handleSignOut}
+        />
+
+        {view === ViewState.HOME && (
+          <PaperList onSelectPaper={handleSelectPaper} onPapersLoaded={handlePapersLoaded} />
+        )}
+
+        {view === ViewState.PAPER_DETAIL && selectedPaper && conversationForUi && (
+          <PaperDetail
+            paper={selectedPaper}
+            conversation={conversationForUi}
+            onSendMessage={handleSendMessage}
+            onBack={handleGoHome}
+          />
+        )}
+
+        {isLoadingPaper && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-black border-t-transparent mx-auto mb-4"></div>
+              <p className="font-bold">Loading paper...</p>
             </div>
           </div>
-          <PaperList onSelectPaper={handleSelectPaper} onPapersLoaded={handlePapersLoaded} />
-        </>
-      )}
-
-      {view === ViewState.PAPER_DETAIL && selectedPaper && currentConversation && (
-        <PaperDetail
-          paper={selectedPaper}
-          conversation={currentConversation}
-          onSendMessage={handleSendMessage}
-          onBack={handleGoHome}
-        />
-      )}
-
-      {view === ViewState.PAPER_DETAIL && selectedPaper && !currentConversation && !isLoadingPaper && (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-black border-t-transparent mx-auto mb-4"></div>
-            <p className="font-bold">Loading chat...</p>
-          </div>
-        </div>
-      )}
-
-      {isLoadingPaper && (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-black border-t-transparent mx-auto mb-4"></div>
-            <p className="font-bold">Loading paper...</p>
-          </div>
-        </div>
-      )}
+        )}
+      </main>
     </div>
   );
 };
