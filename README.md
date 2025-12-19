@@ -1,6 +1,6 @@
 # HuggingPapers
 
-A modern, brutalist-designed chat interface for discussing ArXiv papers, powered by OpenRouter and Gemini 2.5 Flash.
+A modern, brutalist-designed chat interface for discussing ArXiv papers, powered by OpenRouter and Gemini 3 Flash Preview.
 
 ## Features
 
@@ -13,7 +13,7 @@ A modern, brutalist-designed chat interface for discussing ArXiv papers, powered
 ## Tech Stack
 
 - **Frontend**: React, Vite, TailwindCSS
-- **AI**: OpenRouter API (accessing Google Gemini 2.5 Flash)
+- **AI**: OpenRouter API (accessing Google Gemini 3 Flash Preview)
 - **Backend**: Convex (database + realtime + auth)
 - **Data**: Hugging Face Daily Papers API
 

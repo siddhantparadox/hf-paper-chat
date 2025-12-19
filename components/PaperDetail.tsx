@@ -3,6 +3,7 @@ import { Paper, Conversation } from '../types';
 import { NeoButton } from './NeoButton';
 import { Streamdown } from 'streamdown';
 import { fetchPaperDetails, fetchPaperRepos, HFPaperRepos } from '../services/hfService';
+import { DEFAULT_MODEL_LABEL } from '../services/aiService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Button } from './ui/button';
 import { Github, Link2, MessageCircle, Star, ThumbsUp } from 'lucide-react';
@@ -314,7 +315,7 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, c
                 ${msg.role === 'user' ? 'bg-hf-yellow' : 'bg-white'}
               `}>
                 <div className="font-bold text-xs mb-1 opacity-50 uppercase tracking-wider">
-                  {msg.role === 'user' ? 'You' : 'Gemini 2.5 Flash'}
+                  {msg.role === 'user' ? 'You' : DEFAULT_MODEL_LABEL}
                 </div>
                 <div className="markdown-body prose prose-sm max-w-none break-words">
                   <Streamdown isAnimating={msg.isThinking}>{msg.content || ''}</Streamdown>

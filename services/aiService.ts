@@ -8,7 +8,8 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: true // Required for client-side usage if not using a backend proxy
 });
 
-const MODEL_NAME = "google/gemini-2.5-flash-preview-09-2025";
+const DEFAULT_MODEL = 'google/gemini-3-flash-preview';
+export const DEFAULT_MODEL_LABEL = 'Gemini 3 Flash Preview';
 
 export const createSystemInstruction = (paper: Paper): string => {
   return `
@@ -45,7 +46,7 @@ export const streamMessageToChat = async function* (messages: ChatMessage[], pap
     ] as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
 
     const stream = await openai.chat.completions.create({
-      model: MODEL_NAME,
+      model: DEFAULT_MODEL,
       messages: apiMessages,
       stream: true,
       temperature: 0.7,
