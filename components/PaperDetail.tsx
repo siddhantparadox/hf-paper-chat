@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Paper, Conversation } from '../types';
+import { Paper, Conversation, ReasoningMode } from '../types';
 import { NeoButton } from './NeoButton';
 import { Streamdown } from 'streamdown';
 import { fetchPaperDetails, fetchPaperRepos, HFPaperRepos } from '../services/hfService';
@@ -11,7 +11,7 @@ import { Github, Link2, MessageCircle, Star, ThumbsUp } from 'lucide-react';
 interface PaperDetailProps {
   paper: Paper;
   conversation: Conversation;
-  onSendMessage: (input: string) => Promise<void>;
+  onSendMessage: (input: string, reasoningMode: ReasoningMode) => Promise<void>;
   onBack: () => void;
 }
 
@@ -71,6 +71,7 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, c
   const [repos, setRepos] = useState<HFPaperRepos>({ models: [], datasets: [], spaces: [] });
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [reasoningMode, setReasoningMode] = useState<ReasoningMode>('fast');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Get messages from conversation prop
@@ -115,7 +116,7 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, c
     setIsLoading(true);
 
     try {
-      await onSendMessage(input);
+      await onSendMessage(input, reasoningMode);
     } finally {
       setIsLoading(false);
     }
@@ -317,6 +318,16 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, c
                 <div className="font-bold text-xs mb-1 opacity-50 uppercase tracking-wider">
                   {msg.role === 'user' ? 'You' : DEFAULT_MODEL_LABEL}
                 </div>
+                {msg.role === 'assistant' && msg.reasoning?.trim() && (
+                  <details className="mb-3 border-2 border-black bg-gray-50 px-3 py-2">
+                    <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                      Reasoning
+                    </summary>
+                    <div className="markdown-body prose prose-sm mt-2 max-h-64 max-w-none overflow-y-auto break-words text-xs text-gray-800">
+                      <Streamdown isAnimating={msg.isThinking}>{msg.reasoning}</Streamdown>
+                    </div>
+                  </details>
+                )}
                 <div className="markdown-body prose prose-sm max-w-none break-words">
                   <Streamdown isAnimating={msg.isThinking}>{msg.content || ''}</Streamdown>
                 </div>
@@ -336,6 +347,40 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, c
         </div>
 
         <div className="p-4 bg-white border-t-2 border-black">
+          <div className="mb-2 max-w-3xl mx-auto flex justify-end">
+            <div
+              role="group"
+              aria-label="Reasoning mode"
+              className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-gray-500"
+            >
+              <div className="inline-flex overflow-hidden rounded-full border border-black/40 bg-white">
+                <button
+                  type="button"
+                  onClick={() => setReasoningMode('fast')}
+                  aria-pressed={reasoningMode === 'fast'}
+                  className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                    reasoningMode === 'fast'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black/70 hover:text-black'
+                  }`}
+                >
+                  Fast
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReasoningMode('reasoning')}
+                  aria-pressed={reasoningMode === 'reasoning'}
+                  className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                    reasoningMode === 'reasoning'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black/70 hover:text-black'
+                  }`}
+                >
+                  Reasoning
+                </button>
+              </div>
+            </div>
+          </div>
           <form
             onSubmit={(e) => { e.preventDefault(); handleSend(); }}
             className="flex gap-2 max-w-3xl mx-auto"

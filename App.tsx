@@ -7,7 +7,7 @@ import { Header } from './components/Header';
 import { ConversationSidebar } from './components/ConversationSidebar';
 import { PaperList } from './components/PaperList';
 import { PaperDetail } from './components/PaperDetail';
-import { Paper, ViewState, Conversation, ChatMessage } from './types';
+import { Paper, ViewState, Conversation, ChatMessage, ReasoningMode } from './types';
 import { getPaperById } from './services/hfService';
 import { streamMessageToChat } from './services/aiService';
 
@@ -188,7 +188,7 @@ const App: React.FC = () => {
   }, [selectedPaper, activeConversationId, conversationForPaper]);
 
   // Handle sending a message in the chat
-  const handleSendMessage = useCallback(async (input: string) => {
+  const handleSendMessage = useCallback(async (input: string, reasoningMode: ReasoningMode) => {
     if (!selectedPaper) return;
 
     const now = new Date().toISOString();
@@ -213,6 +213,7 @@ const App: React.FC = () => {
       id: msg._id,
       role: msg.role as ChatMessage['role'],
       content: msg.content,
+      reasoning: msg.reasoning,
       createdAt: msg.createdAt,
     }));
 
@@ -233,9 +234,11 @@ const App: React.FC = () => {
       content: '',
       createdAt: now,
       isThinking: true,
+      reasoning: '',
     });
 
     let assistantContent = '';
+    let assistantReasoning = '';
     const stream = streamMessageToChat(
       [
         ...existingMessages,
@@ -247,26 +250,38 @@ const App: React.FC = () => {
         },
       ],
       selectedPaper,
+      { reasoningMode },
     );
 
     for await (const chunk of stream) {
-      assistantContent += chunk;
+      if (chunk.content) {
+        assistantContent += chunk.content;
+      }
+      if (chunk.reasoning) {
+        assistantReasoning += chunk.reasoning;
+      }
       setStreamingAssistantMessage((prev) =>
         prev && prev.id === localAssistantMessageId
-          ? { ...prev, content: assistantContent }
+          ? { ...prev, content: assistantContent, reasoning: assistantReasoning }
           : prev,
       );
     }
 
     setStreamingAssistantMessage((prev) =>
       prev && prev.id === localAssistantMessageId
-        ? { ...prev, content: assistantContent, isThinking: false }
+        ? { ...prev, content: assistantContent, reasoning: assistantReasoning, isThinking: false }
         : prev,
     );
 
     await appendMessages({
       conversationId,
-      messages: [{ role: 'assistant', content: assistantContent }],
+      messages: [
+        {
+          role: 'assistant',
+          content: assistantContent,
+          reasoning: assistantReasoning || undefined,
+        },
+      ],
     });
   }, [selectedPaper, activeConversationId, conversationWithMessages, createConversation, appendMessages]);
 
@@ -278,7 +293,8 @@ const App: React.FC = () => {
     if (
       lastPersisted &&
       lastPersisted.role === streamingAssistantMessage.role &&
-      lastPersisted.content === streamingAssistantMessage.content
+      lastPersisted.content === streamingAssistantMessage.content &&
+      (lastPersisted.reasoning ?? '') === (streamingAssistantMessage.reasoning ?? '')
     ) {
       setStreamingAssistantMessage(null);
     }
@@ -310,6 +326,7 @@ const App: React.FC = () => {
     id: msg._id,
     role: msg.role as ChatMessage['role'],
     content: msg.content,
+    reasoning: msg.reasoning,
     createdAt: msg.createdAt,
   }));
 

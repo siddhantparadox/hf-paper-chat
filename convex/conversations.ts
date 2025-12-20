@@ -132,6 +132,7 @@ export const appendMessages = mutation({
       v.object({
         role: v.string(),
         content: v.string(),
+        reasoning: v.optional(v.string()),
       }),
     ),
   },

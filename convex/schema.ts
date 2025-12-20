@@ -20,6 +20,7 @@ const schema = defineSchema({
     conversationId: v.id("conversations"),
     role: v.string(), // "user" | "assistant" | "system"
     content: v.string(),
+    reasoning: v.optional(v.string()),
     createdAt: v.string(),
   }).index("by_conversation", ["conversationId"]),
 });

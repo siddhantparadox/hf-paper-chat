@@ -28,6 +28,7 @@ export interface Paper {
 }
 
 export type ChatRole = "user" | "assistant" | "system";
+export type ReasoningMode = "fast" | "reasoning";
 
 export interface ChatMessage {
   id: string;
@@ -35,6 +36,7 @@ export interface ChatMessage {
   content: string;
   createdAt: string;
   isThinking?: boolean; // UI-only state for streaming
+  reasoning?: string;
 }
 
 export interface Conversation {
