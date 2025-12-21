@@ -43,9 +43,9 @@ const extractReasoningText = (details: ReasoningDetail[]) => {
   return text;
 };
 
-export const createSystemInstruction = (paper: Paper): string => {
-  return `
-    You are a helpful AI research assistant embedded in the "HuggingPapers" platform.
+export const createSystemInstruction = (paper: Paper, ragContext?: string): string => {
+  const base = `
+    You are a paper-reading assistant embedded in the "HuggingPapers" platform.
     You are currently discussing the following academic paper:
     
     Title: ${paper.title}
@@ -55,21 +55,42 @@ export const createSystemInstruction = (paper: Paper): string => {
     Abstract:
     ${paper.abstract}
     
-    Your goal is to help the user understand this paper. 
-    Answer questions based on the abstract provided above. 
-    If the question requires information not present in the abstract, use your general knowledge but clarify that it might not be in the specific paper text provided.
+    Your goal is to help the user understand this paper.
     Keep answers concise, technical where appropriate, and easy to read.
     Format your responses using Markdown.
+
+    Rules:
+    - Use only the paper excerpts for paper-specific claims.
+    - If the excerpts do not contain the needed info, say you cannot find it in the paper.
+    - Cite evidence using page markers like [PAGE 12].
+    - Quote short phrases for numbers, datasets, metrics, or method details.
+    - If the user asks for a definition, give the paper's definition first, then a plain-language paraphrase.
+    - If multiple excerpts disagree, say so and show both.
+    - When excerpts are provided, end with an \"Evidence\" section of bullet quotes with page markers.
   `;
+  if (!ragContext?.trim()) {
+    return `${base}
+
+No paper excerpts were retrieved for this question. Answer only from the abstract and say when the abstract does not cover the request.
+`;
+  }
+
+  return `${base}
+
+Paper excerpts:
+${ragContext}
+
+Use these excerpts as the primary source. If they do not cover the answer, say what is missing and ask for the specific section or page.
+`;
 };
 
 export const streamMessageToChat = async function* (
   messages: ChatMessage[],
   paper: Paper,
-  options?: { reasoningMode?: ReasoningMode },
+  options?: { reasoningMode?: ReasoningMode; ragContext?: string },
 ): AsyncGenerator<StreamChunk> {
   try {
-    const systemInstruction = createSystemInstruction(paper);
+    const systemInstruction = createSystemInstruction(paper, options?.ragContext);
     const reasoningMode = options?.reasoningMode ?? "fast";
     const reasoning = getReasoningConfig(reasoningMode);
     const emitReasoning = reasoningMode === "reasoning";

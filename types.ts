@@ -37,6 +37,9 @@ export interface ChatMessage {
   createdAt: string;
   isThinking?: boolean; // UI-only state for streaming
   reasoning?: string;
+  ragUsed?: boolean;
+  ragEntryId?: string;
+  ragChunkCount?: number;
 }
 
 export interface Conversation {

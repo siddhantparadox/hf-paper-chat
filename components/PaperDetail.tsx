@@ -13,6 +13,12 @@ interface PaperDetailProps {
   conversation: Conversation;
   onSendMessage: (input: string, reasoningMode: ReasoningMode) => Promise<void>;
   onBack: () => void;
+  ragStatus?: "not_indexed" | "indexing" | "ready" | "failed";
+  ragError?: string | null;
+  isIndexingRag?: boolean;
+  isDeletingRag?: boolean;
+  onIndexPaperForRag?: () => Promise<void>;
+  onDeletePaperRag?: () => Promise<void>;
 }
 
 const ResourceSection = ({ title, items, type }: { title: string, items: any[], type: 'model' | 'dataset' | 'space' }) => {
@@ -66,13 +72,25 @@ const ResourceSection = ({ title, items, type }: { title: string, items: any[], 
   );
 };
 
-export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, conversation, onSendMessage, onBack }) => {
+export const PaperDetail: React.FC<PaperDetailProps> = ({
+  paper: initialPaper,
+  conversation,
+  onSendMessage,
+  onBack,
+  ragStatus,
+  ragError,
+  isIndexingRag,
+  isDeletingRag,
+  onIndexPaperForRag,
+  onDeletePaperRag,
+}) => {
   const [paper, setPaper] = useState<Paper>(initialPaper);
   const [repos, setRepos] = useState<HFPaperRepos>({ models: [], datasets: [], spaces: [] });
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [reasoningMode, setReasoningMode] = useState<ReasoningMode>('fast');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isChatReady = ragStatus === "ready";
 
   // Get messages from conversation prop
   const messages = conversation.messages;
@@ -109,6 +127,7 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, c
   }, [messages]);
 
   const handleSend = async () => {
+    if (!isChatReady) return;
     if (!inputValue.trim() || isLoading) return;
 
     const input = inputValue;
@@ -302,13 +321,57 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, c
                 </a>
               </div>
             </div>
+            <div className="mt-4 flex flex-col gap-2">
+              {ragStatus === "failed" && ragError ? (
+                <div className="text-xs text-red-300 break-words">{ragError}</div>
+              ) : null}
+              {ragStatus === "failed" ? (
+                <div className="flex flex-wrap gap-3">
+                  <NeoButton
+                    variant="secondary"
+                    className="w-full sm:w-auto"
+                    disabled={!onIndexPaperForRag || isIndexingRag}
+                    onClick={() => onIndexPaperForRag?.()}
+                  >
+                    Retry indexing
+                  </NeoButton>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Right Panel: Chat Interface */}
       <div className="w-full lg:w-1/2 flex flex-col bg-[#fdfdfd]">
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+        {!isChatReady ? (
+          <div className="flex-1 flex items-center justify-center p-6">
+            <div className="text-center max-w-sm">
+              {ragStatus !== "failed" ? (
+                <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-black border-t-transparent"></div>
+              ) : null}
+              <p className="text-lg font-bold">Getting the paper ready...</p>
+              <p className="mt-2 text-xs text-gray-600">
+                Indexing the full paper so answers are grounded in the text.
+              </p>
+              {ragStatus === "failed" && ragError ? (
+                <div className="mt-3 text-xs text-red-600 break-words">{ragError}</div>
+              ) : null}
+              {ragStatus === "failed" && onIndexPaperForRag ? (
+                <NeoButton
+                  variant="secondary"
+                  className="mt-4 w-full"
+                  disabled={isIndexingRag}
+                  onClick={() => onIndexPaperForRag?.()}
+                >
+                  Retry indexing
+                </NeoButton>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
           {messages.map((msg) => (
             <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`
@@ -398,6 +461,8 @@ export const PaperDetail: React.FC<PaperDetailProps> = ({ paper: initialPaper, c
             </NeoButton>
           </form>
         </div>
+          </>
+        )}
       </div>
 
     </div>

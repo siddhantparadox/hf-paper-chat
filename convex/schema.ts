@@ -21,8 +21,31 @@ const schema = defineSchema({
     role: v.string(), // "user" | "assistant" | "system"
     content: v.string(),
     reasoning: v.optional(v.string()),
+    ragUsed: v.optional(v.boolean()),
+    ragEntryId: v.optional(v.string()),
+    ragChunkCount: v.optional(v.number()),
     createdAt: v.string(),
   }).index("by_conversation", ["conversationId"]),
+
+  paperRag: defineTable({
+    paperId: v.string(),
+    title: v.string(),
+    pdfUrl: v.string(),
+    status: v.string(), // "not_indexed" | "indexing" | "ready" | "failed"
+    chunkCount: v.optional(v.number()),
+    pageCount: v.optional(v.number()),
+    embeddingModel: v.string(),
+    embeddingDimensions: v.optional(v.number()),
+    contentHash: v.optional(v.string()),
+    entryId: v.optional(v.union(v.string(), v.null())),
+    error: v.optional(v.union(v.string(), v.null())),
+    lastIndexedAt: v.optional(v.string()),
+    lastUsedAt: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_paper", ["paperId"])
+    .index("by_status", ["status"]),
 });
 
 export default schema;

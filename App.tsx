@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useMutation, useQuery } from 'convex/react';
+import { useAction, useMutation, useQuery } from 'convex/react';
 import { api } from './convex/_generated/api';
 import type { Id } from './convex/_generated/dataModel';
 import { useAuthActions } from '@convex-dev/auth/react';
@@ -10,6 +10,7 @@ import { PaperDetail } from './components/PaperDetail';
 import { Paper, ViewState, Conversation, ChatMessage, ReasoningMode } from './types';
 import { getPaperById } from './services/hfService';
 import { streamMessageToChat } from './services/aiService';
+import { extractPdfTextByPage, chunkPdfText, hashText, buildPdfProxyUrl } from './utils/pdf';
 
 interface HistoryState {
   view: ViewState;
@@ -25,6 +26,8 @@ const App: React.FC = () => {
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
   const [papers, setPapers] = useState<Paper[]>([]);
   const [isLoadingPaper, setIsLoadingPaper] = useState(false);
+  const [isIndexingRag, setIsIndexingRag] = useState(false);
+  const [isDeletingRag, setIsDeletingRag] = useState(false);
 
   const [activeConversationId, setActiveConversationId] = useState<Id<'conversations'> | null>(null);
   const [streamingAssistantMessage, setStreamingAssistantMessage] = useState<ChatMessage | null>(null);
@@ -44,6 +47,15 @@ const App: React.FC = () => {
     api.conversations.getWithMessages,
     activeConversationId ? { conversationId: activeConversationId } : "skip",
   );
+
+  const ragStatusRow = useQuery(
+    api.rag.getPaperRagStatus,
+    selectedPaper ? { paperId: selectedPaper.id } : "skip",
+  );
+
+  const indexPaperFromChunks = useAction(api.rag.indexPaperFromChunks);
+  const searchPaperRag = useAction(api.rag.searchPaperRag);
+  const deletePaperRagIndex = useAction(api.rag.deletePaperRagIndex);
 
   // Parse URL and set initial state
   const parseURLState = useCallback(() => {
@@ -187,9 +199,66 @@ const App: React.FC = () => {
     };
   }, [selectedPaper, activeConversationId, conversationForPaper]);
 
+  const ragStatus = ragStatusRow?.status ?? "not_indexed";
+
+  const handleIndexPaperForRag = useCallback(async (force = false) => {
+    if (!selectedPaper?.pdfUrl) return;
+    if (isIndexingRag) return;
+    if (!force && ragStatus === "ready") return;
+
+    setIsIndexingRag(true);
+    try {
+      const pdfProxyUrl = buildPdfProxyUrl(selectedPaper.pdfUrl);
+      const { pageTexts, fullText } = await extractPdfTextByPage(pdfProxyUrl);
+      const contentHash = await hashText(fullText);
+      const chunks = chunkPdfText(fullText);
+
+      if (!chunks.length) {
+        throw new Error("No text extracted from PDF.");
+      }
+
+      await indexPaperFromChunks({
+        paperId: selectedPaper.id,
+        title: selectedPaper.title,
+        pdfUrl: selectedPaper.pdfUrl,
+        pageCount: pageTexts.length,
+        chunks,
+        contentHash,
+        force,
+      });
+    } catch (error) {
+      console.error("Failed to index paper for RAG:", error);
+    } finally {
+      setIsIndexingRag(false);
+    }
+  }, [selectedPaper, isIndexingRag, indexPaperFromChunks, ragStatus]);
+
+  useEffect(() => {
+    if (!selectedPaper?.pdfUrl) return;
+    if (ragStatusRow === undefined) return;
+    if (ragStatus !== "not_indexed") return;
+    if (isIndexingRag) return;
+    void handleIndexPaperForRag(false);
+  }, [selectedPaper?.id, selectedPaper?.pdfUrl, ragStatusRow, ragStatus, isIndexingRag, handleIndexPaperForRag]);
+
+  const handleDeletePaperRag = useCallback(async () => {
+    if (!selectedPaper) return;
+    if (isDeletingRag) return;
+    const confirmed = window.confirm("Delete this paper's RAG index?");
+    if (!confirmed) return;
+
+    setIsDeletingRag(true);
+    try {
+      await deletePaperRagIndex({ paperId: selectedPaper.id });
+    } finally {
+      setIsDeletingRag(false);
+    }
+  }, [selectedPaper, isDeletingRag, deletePaperRagIndex]);
+
   // Handle sending a message in the chat
   const handleSendMessage = useCallback(async (input: string, reasoningMode: ReasoningMode) => {
     if (!selectedPaper) return;
+    if (ragStatus !== "ready") return;
 
     const now = new Date().toISOString();
     setOptimisticUserMessage({
@@ -215,7 +284,10 @@ const App: React.FC = () => {
       content: msg.content,
       reasoning: msg.reasoning,
       createdAt: msg.createdAt,
-    }));
+      ragUsed: msg.ragUsed,
+      ragEntryId: msg.ragEntryId,
+      ragChunkCount: msg.ragChunkCount,
+      }));
 
     await appendMessages({
       conversationId,
@@ -237,6 +309,69 @@ const App: React.FC = () => {
       reasoning: '',
     });
 
+    let ragText: string | undefined;
+    let ragMeta:
+      | {
+        ragUsed: boolean;
+        ragChunkCount?: number;
+        ragEntryId?: string;
+      }
+      | undefined;
+    if (ragStatus === "ready") {
+      try {
+        const ragRes = await searchPaperRag({
+          paperId: selectedPaper.id,
+          query: input,
+          limit: 8,
+        });
+        const resultCount = ragRes.results?.length ?? 0;
+        const hasResults = resultCount > 0;
+        ragText = hasResults && ragRes.text?.trim() ? ragRes.text : undefined;
+        ragMeta = {
+          ragUsed: hasResults,
+          ragChunkCount: resultCount,
+          ragEntryId: hasResults ? ragRes.entries?.[0]?.entryId : undefined,
+        };
+      } catch (error) {
+        console.warn("RAG search failed:", error);
+        ragText = undefined;
+        ragMeta = { ragUsed: false, ragChunkCount: 0 };
+      }
+    }
+
+    if (ragMeta) {
+      setStreamingAssistantMessage((prev) =>
+        prev && prev.id === localAssistantMessageId ? { ...prev, ...ragMeta } : prev,
+      );
+    }
+
+    if (ragStatus === "ready" && !ragText?.trim()) {
+      const fallback =
+        "I couldn't find this in the paper text excerpts. Try asking with different wording or point me to a specific section or page.";
+      setStreamingAssistantMessage((prev) =>
+        prev && prev.id === localAssistantMessageId
+          ? {
+            ...prev,
+            content: fallback,
+            reasoning: "",
+            isThinking: false,
+            ...(ragMeta ?? {}),
+          }
+          : prev,
+      );
+      await appendMessages({
+        conversationId,
+        messages: [
+          {
+            role: 'assistant',
+            content: fallback,
+            ...(ragMeta ?? {}),
+          },
+        ],
+      });
+      return;
+    }
+
     let assistantContent = '';
     let assistantReasoning = '';
     const stream = streamMessageToChat(
@@ -250,7 +385,7 @@ const App: React.FC = () => {
         },
       ],
       selectedPaper,
-      { reasoningMode },
+      { reasoningMode, ragContext: ragText },
     );
 
     for await (const chunk of stream) {
@@ -280,10 +415,19 @@ const App: React.FC = () => {
           role: 'assistant',
           content: assistantContent,
           reasoning: assistantReasoning || undefined,
+          ...(ragMeta ?? {}),
         },
       ],
     });
-  }, [selectedPaper, activeConversationId, conversationWithMessages, createConversation, appendMessages]);
+  }, [
+    selectedPaper,
+    activeConversationId,
+    conversationWithMessages,
+    createConversation,
+    appendMessages,
+    ragStatus,
+    searchPaperRag,
+  ]);
 
   useEffect(() => {
     if (!streamingAssistantMessage || streamingAssistantMessage.isThinking) return;
@@ -328,6 +472,9 @@ const App: React.FC = () => {
     content: msg.content,
     reasoning: msg.reasoning,
     createdAt: msg.createdAt,
+    ragUsed: msg.ragUsed,
+    ragEntryId: msg.ragEntryId,
+    ragChunkCount: msg.ragChunkCount,
   }));
 
   const lastPersistedMessage = persistedMessages[persistedMessages.length - 1];
@@ -403,6 +550,12 @@ const App: React.FC = () => {
             conversation={conversationForUi}
             onSendMessage={handleSendMessage}
             onBack={handleGoHome}
+            ragStatus={ragStatus as "not_indexed" | "indexing" | "ready" | "failed"}
+            ragError={ragStatusRow?.error ?? null}
+            isIndexingRag={isIndexingRag}
+            isDeletingRag={isDeletingRag}
+            onIndexPaperForRag={() => handleIndexPaperForRag(true)}
+            onDeletePaperRag={handleDeletePaperRag}
           />
         )}
 
