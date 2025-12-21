@@ -11,6 +11,7 @@ export type ExtractedPdf = {
 
 const HEADER_FOOTER_LINE_COUNT = 2;
 const HEADER_FOOTER_REPEAT_THRESHOLD = 0.6;
+const PDF_RANGE_CHUNK_SIZE = 4 * 1024 * 1024;
 
 const DEFAULT_CHUNKER_OPTIONS = {
   delimiter: "\n\n",
@@ -206,13 +207,65 @@ export async function extractPdfTextByPage(
   opts?: { maxPages?: number },
 ): Promise<ExtractedPdf> {
   const maxPages = opts?.maxPages;
-  const res = await fetch(pdfUrl);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch PDF (${res.status})`);
+  const initialRangeEnd = PDF_RANGE_CHUNK_SIZE - 1;
+  const initialRes = await fetch(pdfUrl, {
+    headers: { Range: `bytes=0-${initialRangeEnd}` },
+  });
+  if (!initialRes.ok) {
+    throw new Error(`Failed to fetch PDF range (${initialRes.status})`);
   }
-  const data = await res.arrayBuffer();
+  const initialBuffer = await initialRes.arrayBuffer();
+  const contentRange = initialRes.headers.get("Content-Range");
+  const contentLength = initialRes.headers.get("Content-Length");
+  const totalMatch = contentRange?.match(/\/(\d+)$/);
+  const totalLength = totalMatch ? Number(totalMatch[1]) : contentLength ? Number(contentLength) : NaN;
 
-  const pdf = await (pdfjsLib as any).getDocument({ data }).promise;
+  if (!Number.isFinite(totalLength) || totalLength <= 0) {
+    throw new Error("Missing PDF length headers.");
+  }
+
+  const transport = new (pdfjsLib as any).PDFDataRangeTransport(
+    totalLength,
+    new Uint8Array(initialBuffer),
+  ) as {
+    requestDataRange: (begin: number, end: number) => void;
+    abort: () => void;
+    onDataRange: (begin: number, chunk: Uint8Array) => void;
+  };
+
+  const controllers = new Set<AbortController>();
+  transport.requestDataRange = async (begin: number, end: number) => {
+    if (end <= begin) return;
+    const cappedEnd = Math.min(end, totalLength);
+    const controller = new AbortController();
+    controllers.add(controller);
+    try {
+      const res = await fetch(pdfUrl, {
+        headers: { Range: `bytes=${begin}-${cappedEnd - 1}` },
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to fetch PDF range (${res.status})`);
+      }
+      const buffer = await res.arrayBuffer();
+      transport.onDataRange(begin, new Uint8Array(buffer));
+    } finally {
+      controllers.delete(controller);
+    }
+  };
+  transport.abort = () => {
+    for (const controller of controllers) {
+      controller.abort();
+    }
+    controllers.clear();
+  };
+
+  const pdf = await (pdfjsLib as any).getDocument({
+    range: transport,
+    rangeChunkSize: PDF_RANGE_CHUNK_SIZE,
+    disableStream: true,
+    disableAutoFetch: true,
+  }).promise;
   const pageCount = maxPages ? Math.min(pdf.numPages, maxPages) : pdf.numPages;
   const rawPages: string[][] = [];
 
